@@ -10,6 +10,7 @@ public class EconomIAQueryDbContext(DbContextOptions<EconomIAQueryDbContext> opt
 	public DbSet<Unidade> Unidades { get; set; } = null!;
 	public DbSet<Compra> Compras { get; set; } = null!;
 	public DbSet<ItemDaCompra> ItensDaCompra { get; set; } = null!;
+	public DbSet<ResultadoDoItem> ResultadosDoItem { get; set; } = null!;
 	public DbSet<Ata> Atas { get; set; } = null!;
 	public DbSet<Contrato> Contratos { get; set; } = null!;
 }

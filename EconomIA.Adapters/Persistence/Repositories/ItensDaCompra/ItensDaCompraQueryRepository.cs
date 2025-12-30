@@ -30,6 +30,7 @@ public class ItensDaCompraQueryRepository : QueryRepository<EconomIAQueryDbConte
 			.Include(x => x.Compra)
 				.ThenInclude(c => c!.Orgao)
 					.ThenInclude(o => o!.Unidades)
+			.Include(x => x.Resultados)
 			.AsExpandableEFCore()
 			.Where(filter.Rule())
 			.ToArrayAsync(cancellationToken);

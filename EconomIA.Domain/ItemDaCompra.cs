@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using EconomIA.Common.Domain;
 
 namespace EconomIA.Domain;
@@ -52,4 +53,5 @@ public class ItemDaCompra : Aggregate {
 	public virtual DateTime AtualizadoEm { get; protected set; }
 
 	public virtual Compra? Compra { get; protected set; }
+	public virtual ICollection<ResultadoDoItem> Resultados { get; protected set; } = new List<ResultadoDoItem>();
 }

@@ -33,6 +33,7 @@ public static class SearchItensDaCompra {
 			DateTime AtualizadoEm,
 			CompraItem? Compra,
 			OrgaoItem? Orgao,
+			ResultadoItem[] Resultados,
 			AtaItem[] Atas,
 			ContratoItem[] Contratos);
 
@@ -57,6 +58,8 @@ public static class SearchItensDaCompra {
 			String Cnpj,
 			String RazaoSocial,
 			String? NomeFantasia,
+			String? PoderId,
+			String? EsferaId,
 			UnidadeItem[] Unidades);
 
 		public record UnidadeItem(
@@ -64,7 +67,9 @@ public static class SearchItensDaCompra {
 			String CodigoUnidade,
 			String NomeUnidade,
 			String? MunicipioNome,
-			String? UfSigla);
+			String? MunicipioCodigoIbge,
+			String? UfSigla,
+			String? UfNome);
 
 		public record AtaItem(
 			Int64 Id,
@@ -92,6 +97,16 @@ public static class SearchItensDaCompra {
 			DateTime? DataAssinatura,
 			DateTime? DataVigenciaInicio,
 			DateTime? DataVigenciaFim);
+
+		public record ResultadoItem(
+			Int64 Id,
+			String? NiFornecedor,
+			String? NomeRazaoSocialFornecedor,
+			Decimal? QuantidadeHomologada,
+			Decimal? ValorUnitarioHomologado,
+			Decimal? ValorTotalHomologado,
+			String? SituacaoCompraItemResultadoNome,
+			DateTime? DataResultado);
 	}
 
 	public class Handler(
@@ -184,13 +199,17 @@ public static class SearchItensDaCompra {
 							x.Compra.Orgao.Cnpj,
 							x.Compra.Orgao.RazaoSocial,
 							x.Compra.Orgao.NomeFantasia,
+							x.Compra.Orgao.PoderId,
+							x.Compra.Orgao.EsferaId,
 							x.Compra.Orgao.Unidades
 								.Select(u => new Response.UnidadeItem(
 									u.Id,
 									u.CodigoUnidade,
 									u.NomeUnidade,
 									u.MunicipioNome,
-									u.UfSigla))
+									u.MunicipioCodigoIbge,
+									u.UfSigla,
+									u.UfNome))
 								.ToArray())
 						: null;
 
@@ -231,6 +250,20 @@ public static class SearchItensDaCompra {
 							.ToArray()
 						: Array.Empty<Response.ContratoItem>();
 
+					var resultadosDoItem = x.Resultados.Count > 0
+						? x.Resultados
+							.Select(r => new Response.ResultadoItem(
+								r.Id,
+								r.NiFornecedor,
+								r.NomeRazaoSocialFornecedor,
+								r.QuantidadeHomologada,
+								r.ValorUnitarioHomologado,
+								r.ValorTotalHomologado,
+								r.SituacaoCompraItemResultadoNome,
+								r.DataResultado))
+							.ToArray()
+						: Array.Empty<Response.ResultadoItem>();
+
 					return new Response.Item(
 						x.Id,
 						x.IdentificadorDaCompra,
@@ -248,6 +281,7 @@ public static class SearchItensDaCompra {
 						x.AtualizadoEm,
 						compraItem,
 						orgaoItem,
+						resultadosDoItem,
 						atasDoItem,
 						contratosDoItem);
 				})

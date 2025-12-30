@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using EconomIA.Adapters.Persistence;
 using EconomIA.Adapters.Persistence.Repositories.Atas;
 using EconomIA.Adapters.Persistence.Repositories.Contratos;
@@ -10,11 +11,17 @@ using EconomIA.Endpoints.ItensDaCompra;
 using EconomIA.Endpoints.Orgaos;
 using Elastic.Clients.Elasticsearch;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<JsonOptions>(options => {
+	options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+	options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never;
+});
 
 builder.Services.AddMediatR(configuration => {
 	configuration.RegisterServicesFromAssemblyContaining<ListOrgaos.Query>();
@@ -25,7 +32,6 @@ var elasticsearchUrl = builder.Configuration.GetConnectionString("Elasticsearch"
 
 builder.Services.AddDbContextFactory<EconomIAQueryDbContext>(options => {
 	options.UseNpgsql(connectionString);
-	options.UseLazyLoadingProxies();
 });
 
 builder.Services.AddSingleton(_ => {

@@ -77,6 +77,10 @@ public class ItemDaCompraMapping : AggregateMapping<ItemDaCompra> {
 			.IsUnique()
 			.HasDatabaseName("idx_item_compra_unique");
 
+		builder.HasMany(x => x.Resultados)
+			.WithOne(x => x.ItemDaCompra)
+			.HasForeignKey(x => x.IdentificadorDoItemDaCompra);
+
 		builder.Ignore(x => x.DomainEvents);
 	}
 }

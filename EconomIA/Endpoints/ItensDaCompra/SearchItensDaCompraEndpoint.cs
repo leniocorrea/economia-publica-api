@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EconomIA.Application.Queries.SearchItensDaCompra;
@@ -31,164 +32,124 @@ public static class SearchItensDaCompraEndpoint {
 		return result.ToOk(Response.From);
 	}
 
-	private record Response(Response.Item[] Items, Int64 TotalHits, Boolean HasMoreItems, String? NextCursor) {
+	private record Response(Resultado[] Resultado, Int64 TotalHits, Boolean HasMoreItems, String? NextCursor) {
 		public static Response From(SearchItensDaCompra.Response response) {
-			var items = response.Items.Select(x => new Item(
-				x.Id,
-				x.IdentificadorDaCompra,
-				x.NumeroItem,
-				x.Descricao,
-				x.Quantidade,
-				x.UnidadeMedida,
-				x.ValorUnitarioEstimado,
-				x.ValorTotal,
-				x.CriterioJulgamentoNome,
-				x.SituacaoCompraItemNome,
-				x.TemResultado,
-				x.DataAtualizacao,
-				x.CriadoEm,
-				x.AtualizadoEm,
-				x.Compra is not null ? CompraItem.From(x.Compra) : null,
-				x.Orgao is not null ? OrgaoItem.From(x.Orgao) : null,
-				x.Atas.Select(AtaItem.From).ToArray(),
-				x.Contratos.Select(ContratoItem.From).ToArray()
-			)).ToArray();
+			var comprasAgrupadas = response.Items
+				.Where(x => x.Compra is not null)
+				.GroupBy(x => x.Compra!.NumeroControlePncp)
+				.Select(g => {
+					var primeiroItem = g.First();
+					var compra = primeiroItem.Compra!;
+					var orgao = primeiroItem.Orgao;
 
-			return new Response(items, response.TotalHits, response.HasMoreItems, response.NextCursor);
-		}
+					var unidade = orgao?.Unidades.FirstOrDefault();
 
-		public record Item(
-			Int64 Id,
-			Int64 IdentificadorDaCompra,
-			Int32 NumeroItem,
-			String? Descricao,
-			Decimal? Quantidade,
-			String? UnidadeMedida,
-			Decimal? ValorUnitarioEstimado,
-			Decimal? ValorTotal,
-			String? CriterioJulgamentoNome,
-			String? SituacaoCompraItemNome,
-			Boolean TemResultado,
-			DateTime? DataAtualizacao,
-			DateTime CriadoEm,
-			DateTime AtualizadoEm,
-			CompraItem? Compra,
-			OrgaoItem? Orgao,
-			AtaItem[] Atas,
-			ContratoItem[] Contratos);
+					return new Resultado(
+						orgao is not null ? new OrgaoEntidade(
+							orgao.Cnpj,
+							orgao.RazaoSocial,
+							orgao.PoderId,
+							orgao.EsferaId,
+							unidade is not null ? new UnidadeDoOrgao(unidade.MunicipioCodigoIbge) : null
+						) : null,
+						new Compra(
+							compra.AnoCompra,
+							compra.SequencialCompra,
+							$"{compra.AnoCompra}/{compra.SequencialCompra}",
+							null,
+							compra.ObjetoCompra,
+							unidade?.UfNome ?? null,
+							null,
+							compra.DataAberturaProposta,
+							compra.DataEncerramentoProposta,
+							compra.LinkPncp,
+							compra.NumeroControlePncp,
+							compra.ModalidadeNome,
+							compra.SituacaoCompraNome,
+							unidade?.UfSigla,
+							g.Select(item => new ItemDaCompra(
+								item.NumeroItem,
+								item.Descricao,
+								null,
+								item.ValorUnitarioEstimado,
+								item.ValorTotal,
+								item.Quantidade,
+								item.UnidadeMedida,
+								item.CriterioJulgamentoNome,
+								item.SituacaoCompraItemNome,
+								item.Resultados.Select(r => new ResultadoItem(
+									item.NumeroItem,
+									r.NiFornecedor,
+									null,
+									r.NomeRazaoSocialFornecedor,
+									null,
+									r.QuantidadeHomologada,
+									r.ValorUnitarioHomologado,
+									r.ValorTotalHomologado,
+									null,
+									compra.NumeroControlePncp
+								)).ToArray()
+							)).ToArray()
+						)
+					);
+				}).ToArray();
 
-		public record CompraItem(
-			Int64 Id,
-			String NumeroControlePncp,
-			Int32 AnoCompra,
-			Int32 SequencialCompra,
-			String? ModalidadeNome,
-			String? ObjetoCompra,
-			Decimal? ValorTotalEstimado,
-			Decimal? ValorTotalHomologado,
-			String? SituacaoCompraNome,
-			DateTime? DataAberturaProposta,
-			DateTime? DataEncerramentoProposta,
-			String? AmparoLegalNome,
-			String? ModoDisputaNome,
-			String? LinkPncp) {
-			public static CompraItem From(SearchItensDaCompra.Response.CompraItem c) =>
-				new CompraItem(
-					c.Id,
-					c.NumeroControlePncp,
-					c.AnoCompra,
-					c.SequencialCompra,
-					c.ModalidadeNome,
-					c.ObjetoCompra,
-					c.ValorTotalEstimado,
-					c.ValorTotalHomologado,
-					c.SituacaoCompraNome,
-					c.DataAberturaProposta,
-					c.DataEncerramentoProposta,
-					c.AmparoLegalNome,
-					c.ModoDisputaNome,
-					c.LinkPncp);
-		}
-
-		public record OrgaoItem(
-			Int64 Id,
-			String Cnpj,
-			String RazaoSocial,
-			String? NomeFantasia,
-			UnidadeItem[] Unidades) {
-			public static OrgaoItem From(SearchItensDaCompra.Response.OrgaoItem o) =>
-				new OrgaoItem(
-					o.Id,
-					o.Cnpj,
-					o.RazaoSocial,
-					o.NomeFantasia,
-					o.Unidades.Select(UnidadeItem.From).ToArray());
-		}
-
-		public record UnidadeItem(
-			Int64 Id,
-			String CodigoUnidade,
-			String NomeUnidade,
-			String? MunicipioNome,
-			String? UfSigla) {
-			public static UnidadeItem From(SearchItensDaCompra.Response.UnidadeItem u) =>
-				new UnidadeItem(u.Id, u.CodigoUnidade, u.NomeUnidade, u.MunicipioNome, u.UfSigla);
-		}
-
-		public record AtaItem(
-			Int64 Id,
-			String NumeroControlePncpAta,
-			String? NumeroAtaRegistroPreco,
-			Int32 AnoAta,
-			String? ObjetoContratacao,
-			Boolean Cancelado,
-			DateTime? DataAssinatura,
-			DateTime? VigenciaInicio,
-			DateTime? VigenciaFim) {
-			public static AtaItem From(SearchItensDaCompra.Response.AtaItem a) =>
-				new AtaItem(
-					a.Id,
-					a.NumeroControlePncpAta,
-					a.NumeroAtaRegistroPreco,
-					a.AnoAta,
-					a.ObjetoContratacao,
-					a.Cancelado,
-					a.DataAssinatura,
-					a.VigenciaInicio,
-					a.VigenciaFim);
-		}
-
-		public record ContratoItem(
-			Int64 Id,
-			String NumeroControlePncp,
-			Int32 AnoContrato,
-			Int32 SequencialContrato,
-			String? NumeroContratoEmpenho,
-			String? ObjetoContrato,
-			String? TipoContratoNome,
-			String? NiFornecedor,
-			String? NomeRazaoSocialFornecedor,
-			Decimal? ValorInicial,
-			Decimal? ValorGlobal,
-			DateTime? DataAssinatura,
-			DateTime? DataVigenciaInicio,
-			DateTime? DataVigenciaFim) {
-			public static ContratoItem From(SearchItensDaCompra.Response.ContratoItem c) =>
-				new ContratoItem(
-					c.Id,
-					c.NumeroControlePncp,
-					c.AnoContrato,
-					c.SequencialContrato,
-					c.NumeroContratoEmpenho,
-					c.ObjetoContrato,
-					c.TipoContratoNome,
-					c.NiFornecedor,
-					c.NomeRazaoSocialFornecedor,
-					c.ValorInicial,
-					c.ValorGlobal,
-					c.DataAssinatura,
-					c.DataVigenciaInicio,
-					c.DataVigenciaFim);
+			return new Response(comprasAgrupadas, response.TotalHits, response.HasMoreItems, response.NextCursor);
 		}
 	}
+
+	private record Resultado(
+		OrgaoEntidade? OrgaoEntidade,
+		Compra Compra);
+
+	private record OrgaoEntidade(
+		String Cnpj,
+		String RazaoSocial,
+		String? PoderId,
+		String? EsferaId,
+		UnidadeDoOrgao? UnidadeDoOrgao);
+
+	private record UnidadeDoOrgao(
+		String? CodigoIbge);
+
+	private record Compra(
+		Int32 AnoCompra,
+		Int32 SequencialCompra,
+		String NumeroCompra,
+		String? Processo,
+		String? ObjetoCompra,
+		String? UfNome,
+		DateTime? DataInclusao,
+		DateTime? DataAberturaProposta,
+		DateTime? DataEncerramentoProposta,
+		String? LinkSistemaOrigem,
+		String NumeroControlePNCP,
+		String? ModalidadeNome,
+		String? SituacaoCompraNome,
+		String? UfSigla,
+		ItemDaCompra[] ItemDaCompra);
+
+	private record ItemDaCompra(
+		Int32 NumeroItem,
+		String? Descricao,
+		String? MaterialOuServico,
+		Decimal? ValorUnitarioEstimado,
+		Decimal? ValorTotal,
+		Decimal? Quantidade,
+		String? UnidadeMedida,
+		String? CriterioJulgamentoNome,
+		String? SituacaoCompraItemNome,
+		ResultadoItem[] Resultado);
+
+	private record ResultadoItem(
+		Int32 NumeroItem,
+		String? NiFornecedor,
+		String? TipoPessoa,
+		String? NomeRazaoSocialFornecedor,
+		String? PorteFornecedorId,
+		Decimal? QuantidadeHomologada,
+		Decimal? ValorUnitarioHomologado,
+		Decimal? ValorTotalHomologado,
+		Int32? OrdemClassificacaoSrp,
+		String NumeroControlePNCPCompra);
 }
