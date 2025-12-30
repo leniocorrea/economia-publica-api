@@ -60,6 +60,10 @@ public class CompraMapping : AggregateMapping<Compra> {
 			.HasMaxLength(200)
 			.IsRequired(false);
 
+		builder.Property(x => x.DataInclusao)
+			.HasColumnName("data_inclusao")
+			.IsRequired(false);
+
 		builder.Property(x => x.DataAberturaProposta)
 			.HasColumnName("data_abertura_proposta")
 			.IsRequired(false);

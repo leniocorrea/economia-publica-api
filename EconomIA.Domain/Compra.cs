@@ -24,6 +24,7 @@ public class Compra : Aggregate {
 		Decimal? valorTotalEstimado = null,
 		Decimal? valorTotalHomologado = null,
 		String? situacaoCompraNome = null,
+		DateTime? dataInclusao = null,
 		DateTime? dataAberturaProposta = null,
 		DateTime? dataEncerramentoProposta = null,
 		String? amparoLegalNome = null,
@@ -43,6 +44,7 @@ public class Compra : Aggregate {
 		ValorTotalEstimado = valorTotalEstimado;
 		ValorTotalHomologado = valorTotalHomologado;
 		SituacaoCompraNome = situacaoCompraNome;
+		DataInclusao = dataInclusao;
 		DataAberturaProposta = dataAberturaProposta;
 		DataEncerramentoProposta = dataEncerramentoProposta;
 		AmparoLegalNome = amparoLegalNome;
@@ -63,6 +65,7 @@ public class Compra : Aggregate {
 	public virtual Decimal? ValorTotalEstimado { get; protected set; }
 	public virtual Decimal? ValorTotalHomologado { get; protected set; }
 	public virtual String? SituacaoCompraNome { get; protected set; }
+	public virtual DateTime? DataInclusao { get; protected set; }
 	public virtual DateTime? DataAberturaProposta { get; protected set; }
 	public virtual DateTime? DataEncerramentoProposta { get; protected set; }
 	public virtual String? AmparoLegalNome { get; protected set; }

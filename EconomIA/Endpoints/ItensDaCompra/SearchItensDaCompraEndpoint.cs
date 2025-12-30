@@ -59,7 +59,7 @@ public static class SearchItensDaCompraEndpoint {
 							null,
 							compra.ObjetoCompra,
 							unidade?.UfNome ?? null,
-							null,
+							compra.DataInclusao,
 							compra.DataAberturaProposta,
 							compra.DataEncerramentoProposta,
 							compra.LinkPncp,
