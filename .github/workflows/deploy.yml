@@ -22,6 +22,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/economia
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
             docker-compose build economia-api
             docker-compose up -d economia-api
