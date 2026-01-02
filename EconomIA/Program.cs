@@ -47,7 +47,7 @@ builder.Services.AddScoped<IContratosReader, ContratosQueryRepository>();
 
 var app = builder.Build();
 
-app.MapGet("/", () => "EconomIA API");
+app.MapGet("/", () => "EconomIA API v1.0.1");
 app.MapOrgaosEndpoints();
 app.MapItensDaCompraEndpoints();
 
