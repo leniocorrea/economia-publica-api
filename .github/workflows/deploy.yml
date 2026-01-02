@@ -20,6 +20,9 @@ jobs:
           host: ${{ env.VM_HOST }}
           username: ${{ env.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 300s
+          command_timeout: 30m
+          debug: true
           script: |
             cd ~/economia
             git fetch origin master
