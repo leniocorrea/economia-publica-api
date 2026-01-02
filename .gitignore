@@ -75,3 +75,6 @@ db/postgres-data/
 
 # Secrets (GCP credentials, etc.)
 secrets/
+
+# Local dotnet tools
+.config/
