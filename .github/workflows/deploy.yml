@@ -34,4 +34,6 @@ jobs:
             --zone=${{ env.ZONE }} \
             --project=${{ env.PROJECT_ID }} \
             --tunnel-through-iap \
-            --command="cd ~/economia && git pull origin master && docker-compose build economia-api && docker-compose up -d economia-api"
+            --quiet \
+            --ssh-key-expire-after=1m \
+            -- "cd ~/economia && git pull origin master && docker-compose build economia-api && docker-compose up -d economia-api"
