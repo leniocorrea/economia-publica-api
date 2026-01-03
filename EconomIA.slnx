@@ -17,4 +17,7 @@
   <Project Path="EconomIA.Domain.Tests\EconomIA.Domain.Tests.csproj" />
   <Project Path="EconomIA\EconomIA.csproj" />
   <Project Path="EconomIA.CargaDeDados\EconomIA.CargaDeDados.csproj" />
+  <Project Path="EconomIA.CargaDeDados.Tests\EconomIA.CargaDeDados.Tests.csproj" />
+  <Project Path="EconomIA.Application.Tests\EconomIA.Application.Tests.csproj" />
+  <Project Path="EconomIA.Adapters.Tests\EconomIA.Adapters.Tests.csproj" />
 </Solution>
