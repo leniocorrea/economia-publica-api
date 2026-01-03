@@ -1,110 +1,124 @@
 using System.Data;
+using EconomIA.CargaDeDados.Configuration;
+using EconomIA.CargaDeDados.HealthChecks;
+using EconomIA.CargaDeDados.Models;
+using EconomIA.CargaDeDados.Observability;
 using EconomIA.CargaDeDados.Repositories;
 using EconomIA.CargaDeDados.Services;
-using Polly;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using EconomIA.CargaDeDados.Workers;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using Polly;
 
 namespace EconomIA.CargaDeDados;
 
 public class Program {
 	public static async Task Main(String[] args) {
-		Console.WriteLine("=== EconomIA - Sistema de Carga de Dados PNCP ===");
-		Console.WriteLine();
+		var modo = args.Length > 0 ? args[0].ToLower() : "worker";
 
+		if (modo == "worker") {
+			await ExecutarComoWorkerAsync(args);
+		} else {
+			await ExecutarComoCLIAsync(args);
+		}
+	}
+
+	private static async Task ExecutarComoWorkerAsync(String[] args) {
+		var builder = WebApplication.CreateBuilder(args);
+
+		builder.Host.ConfigurarLogging(builder.Configuration);
+
+		builder.Services.Configure<WorkerConfiguration>(builder.Configuration.GetSection(WorkerConfiguration.SectionName));
+		builder.Services.Configure<SentryConfiguration>(builder.Configuration.GetSection(SentryConfiguration.SectionName));
+
+		ConfigurarServicosComuns(builder.Services, builder.Configuration);
+
+		builder.Services.AddHostedService<CargaDiariaWorker>();
+		builder.Services.AddHostedService<SincronizacaoOrgaosWorker>();
+
+		var connectionString = builder.Configuration.GetConnectionString("PostgreSQL")!;
+		builder.Services.AddHealthChecks()
+			.AddCheck<WorkerHealthCheck>("worker", tags: new[] { "live", "ready" })
+			.AddNpgSql(connectionString, name: "postgresql", tags: new[] { "ready" });
+
+		var app = builder.Build();
+
+		app.MapHealthCheckEndpoints();
+
+		await app.RunAsync();
+	}
+
+	private static async Task ExecutarComoCLIAsync(String[] args) {
 		var construtor = Host.CreateApplicationBuilder(args);
 
-		var connectionString = construtor.Configuration.GetConnectionString("PostgreSQL");
-		construtor.Services.AddTransient<IDbConnection>(sp => new NpgsqlConnection(connectionString));
+		construtor.Logging.ClearProviders();
+		construtor.Logging.AddConsole();
 
-		var elasticUri = construtor.Configuration["ElasticSearch:Uri"] ?? "http://economia-elasticsearch:9200";
-		var elasticSettings = new Elastic.Clients.Elasticsearch.ElasticsearchClientSettings(new Uri(elasticUri))
-			.DefaultIndex("itens-da-compra");
-		construtor.Services.AddSingleton(new Elastic.Clients.Elasticsearch.ElasticsearchClient(elasticSettings));
-
-		construtor.Services.AddHttpClient<ServicoCarga>(client => {
-				client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-				client.DefaultRequestHeaders.Add("Accept", "application/json");
-			})
-			.AddTransientHttpErrorPolicy(builder => builder
-				.OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-				.WaitAndRetryAsync(new[] {
-					TimeSpan.FromSeconds(2),
-					TimeSpan.FromSeconds(5),
-					TimeSpan.FromSeconds(10),
-					TimeSpan.FromSeconds(20),
-					TimeSpan.FromMinutes(1)
-				}));
-
-		construtor.Services.AddTransient<Orgaos>();
-		construtor.Services.AddTransient<OrgaosMonitorados>();
-		construtor.Services.AddTransient<Unidades>();
-		construtor.Services.AddTransient<Compras>();
-		construtor.Services.AddTransient<ItensDaCompra>();
-		construtor.Services.AddTransient<ResultadosItens>();
-		construtor.Services.AddTransient<Contratos>();
-		construtor.Services.AddTransient<Atas>();
-		construtor.Services.AddTransient<ControlesImportacao>();
-
-		construtor.Services.AddHttpClient<ServicoCargaOrgaos>()
-			.AddTransientHttpErrorPolicy(builder => builder
-				.OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-				.WaitAndRetryAsync(new[] {
-					TimeSpan.FromMilliseconds(500),
-					TimeSpan.FromSeconds(1),
-					TimeSpan.FromSeconds(2),
-					TimeSpan.FromSeconds(5),
-					TimeSpan.FromSeconds(10)
-				}));
-
-		construtor.Services.AddHttpClient<ServicoCargaContratosAtas>(client => {
-				client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-				client.DefaultRequestHeaders.Add("Accept", "application/json");
-			})
-			.AddTransientHttpErrorPolicy(builder => builder
-				.OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-				.WaitAndRetryAsync(new[] {
-					TimeSpan.FromSeconds(2),
-					TimeSpan.FromSeconds(5),
-					TimeSpan.FromSeconds(10),
-					TimeSpan.FromSeconds(20),
-					TimeSpan.FromMinutes(1)
-				}));
-
-		construtor.Services.AddTransient<ServicoOrquestradorImportacao>();
+		ConfigurarServicosComuns(construtor.Services, construtor.Configuration);
 
 		using var host = construtor.Build();
 
 		using var escopo = host.Services.CreateScope();
 		var servicos = escopo.ServiceProvider;
+		var logger = servicos.GetRequiredService<ILogger<Program>>();
+		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
+
+		logger.LogInformation("=== EconomIA - Sistema de Carga de Dados PNCP ===");
 
 		try {
-			var comando = args.Length > 0 ? args[0].ToLower() : "diaria";
+			var comando = args[0].ToLower();
 			var cnpjsFiltro = ObterCnpjsFiltro(args);
 			var diasRetroativos = ObterDiasRetroativos(args);
 
 			switch (comando) {
 				case "orgaos":
-					var servicoCargaOrgaos = servicos.GetRequiredService<ServicoCargaOrgaos>();
-					if (cnpjsFiltro is not null && cnpjsFiltro.Length > 0) {
-						foreach (var cnpj in cnpjsFiltro) {
-							await servicoCargaOrgaos.ImportarOrgaoPorCnpjAsync(cnpj);
+					var metricsOrgaos = new MetricasExecucao();
+					var execucaoOrgaos = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Orgaos, TipoGatilho.Cli);
+
+					try {
+						var servicoCargaOrgaos = servicos.GetRequiredService<ServicoCargaOrgaos>();
+
+						if (cnpjsFiltro is not null && cnpjsFiltro.Length > 0) {
+							foreach (var cnpj in cnpjsFiltro) {
+								await servicoCargaOrgaos.ImportarOrgaoPorCnpjAsync(cnpj);
+							}
+						} else {
+							await servicoCargaOrgaos.CarregarTodosOrgaosEUnidadesAsync();
 						}
-					} else {
-						await servicoCargaOrgaos.CarregarTodosOrgaosEUnidadesAsync();
+
+						await execucoesCarga.FinalizarComSucessoAsync(execucaoOrgaos.Identificador, metricsOrgaos);
+					} catch (Exception ex) {
+						await execucoesCarga.FinalizarComErroAsync(execucaoOrgaos.Identificador, ex.Message, ex.StackTrace, metricsOrgaos);
+						throw;
 					}
 					break;
 
 				case "diaria":
-					var orquestrador = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
-					await orquestrador.ExecutarImportacaoDiariaAsync(cnpjsFiltro, diasRetroativos);
+					var metricsDiaria = new MetricasExecucao();
+					var execucaoDiaria = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Diaria, TipoGatilho.Cli);
+
+					try {
+						var orquestrador = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
+						await orquestrador.ExecutarImportacaoDiariaAsync(metricsDiaria, cnpjsFiltro, diasRetroativos);
+						await execucoesCarga.FinalizarComSucessoAsync(execucaoDiaria.Identificador, metricsDiaria);
+					} catch (Exception ex) {
+						await execucoesCarga.FinalizarComErroAsync(execucaoDiaria.Identificador, ex.Message, ex.StackTrace, metricsDiaria);
+						throw;
+					}
 					break;
 
 				case "incremental":
-					var orquestradorIncremental = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
-					await orquestradorIncremental.ExecutarImportacaoIncrementalAsync(cnpjsFiltro);
+					var metricsIncremental = new MetricasExecucao();
+					var execucaoIncremental = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Incremental, TipoGatilho.Cli);
+
+					try {
+						var orquestradorIncremental = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
+						await orquestradorIncremental.ExecutarImportacaoIncrementalAsync(metricsIncremental, cnpjsFiltro);
+						await execucoesCarga.FinalizarComSucessoAsync(execucaoIncremental.Identificador, metricsIncremental);
+					} catch (Exception ex) {
+						await execucoesCarga.FinalizarComErroAsync(execucaoIncremental.Identificador, ex.Message, ex.StackTrace, metricsIncremental);
+						throw;
+					}
 					break;
 
 				case "status":
@@ -119,16 +133,77 @@ public class Program {
 					break;
 
 				default:
-					Console.WriteLine($"Comando desconhecido: {comando}");
+					logger.LogWarning("Comando desconhecido: {Comando}", comando);
 					ExibirAjuda();
 					break;
 			}
 
-			Console.WriteLine("\nAplicacao finalizada com sucesso!");
+			logger.LogInformation("Aplicacao finalizada com sucesso!");
 		} catch (Exception ex) {
-			Console.WriteLine($"Ocorreu um erro fatal: {ex.Message}");
-			Console.WriteLine(ex.StackTrace);
+			logger.LogError(ex, "Ocorreu um erro fatal");
 		}
+	}
+
+	private static void ConfigurarServicosComuns(IServiceCollection services, IConfiguration configuration) {
+		var connectionString = configuration.GetConnectionString("PostgreSQL");
+		services.AddTransient<IDbConnection>(sp => new NpgsqlConnection(connectionString));
+
+		var elasticUri = configuration["ElasticSearch:Uri"] ?? "http://economia-elasticsearch:9200";
+		var elasticSettings = new Elastic.Clients.Elasticsearch.ElasticsearchClientSettings(new Uri(elasticUri))
+			.DefaultIndex("itens-da-compra");
+		services.AddSingleton(new Elastic.Clients.Elasticsearch.ElasticsearchClient(elasticSettings));
+
+		services.AddHttpClient<ServicoCarga>(client => {
+				client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+				client.DefaultRequestHeaders.Add("Accept", "application/json");
+			})
+			.AddTransientHttpErrorPolicy(builder => builder
+				.OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+				.WaitAndRetryAsync(new[] {
+					TimeSpan.FromSeconds(2),
+					TimeSpan.FromSeconds(5),
+					TimeSpan.FromSeconds(10),
+					TimeSpan.FromSeconds(20),
+					TimeSpan.FromMinutes(1)
+				}));
+
+		services.AddTransient<Orgaos>();
+		services.AddTransient<OrgaosMonitorados>();
+		services.AddTransient<Unidades>();
+		services.AddTransient<Compras>();
+		services.AddTransient<ItensDaCompra>();
+		services.AddTransient<ResultadosItens>();
+		services.AddTransient<Contratos>();
+		services.AddTransient<Atas>();
+		services.AddTransient<ControlesImportacao>();
+		services.AddTransient<ExecucoesCarga>();
+
+		services.AddHttpClient<ServicoCargaOrgaos>()
+			.AddTransientHttpErrorPolicy(builder => builder
+				.OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+				.WaitAndRetryAsync(new[] {
+					TimeSpan.FromMilliseconds(500),
+					TimeSpan.FromSeconds(1),
+					TimeSpan.FromSeconds(2),
+					TimeSpan.FromSeconds(5),
+					TimeSpan.FromSeconds(10)
+				}));
+
+		services.AddHttpClient<ServicoCargaContratosAtas>(client => {
+				client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+				client.DefaultRequestHeaders.Add("Accept", "application/json");
+			})
+			.AddTransientHttpErrorPolicy(builder => builder
+				.OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+				.WaitAndRetryAsync(new[] {
+					TimeSpan.FromSeconds(2),
+					TimeSpan.FromSeconds(5),
+					TimeSpan.FromSeconds(10),
+					TimeSpan.FromSeconds(20),
+					TimeSpan.FromMinutes(1)
+				}));
+
+		services.AddTransient<ServicoOrquestradorImportacao>();
 	}
 
 	private static String[]? ObterCnpjsFiltro(String[] args) {
@@ -158,8 +233,9 @@ public class Program {
 Uso: dotnet run [comando] [opcoes]
 
 Comandos:
+  worker       Inicia o worker de carga automatica (padrao)
   orgaos       Carrega todos os orgaos e unidades do PNCP (~98k orgaos)
-  diaria       Executa importacao diaria de orgaos monitorados (padrao)
+  diaria       Executa importacao diaria de orgaos monitorados
   incremental  Executa importacao incremental de orgaos monitorados
   status       Exibe status de importacao dos orgaos monitorados
 
@@ -167,11 +243,17 @@ Opcoes:
   --cnpjs, -c <cnpjs>   Lista de CNPJs separados por virgula (filtra entre monitorados)
   --dias, -d <dias>     Dias retroativos para importacao diaria (padrao: 1)
 
+Modo Worker:
+  - Executa carga incremental automaticamente no horario configurado
+  - Sincroniza orgaos/unidades semanalmente
+  - Expoe endpoints de health check em /health
+
 Nota: As importacoes (diaria, incremental) processam apenas orgaos monitorados.
       Use a API /v1/orgaos-monitorados/{cnpj} para ativar/desativar monitoramento.
       Primeira carga: ultimos 90 dias. Cargas subsequentes: incrementais.
 
 Exemplos:
+  dotnet run worker
   dotnet run orgaos
   dotnet run diaria --dias 7
   dotnet run diaria --cnpjs 17695032000151,18296681000142

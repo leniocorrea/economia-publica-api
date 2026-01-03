@@ -13,6 +13,7 @@ services:
     volumes:
       - economia-postgres-data:/var/lib/postgresql/data
       - ./docker/postgresql/01_criar_banco.sql:/docker-entrypoint-initdb.d/01_criar_banco.sql:ro
+      - ./docker/postgresql/03_criar_tabelas_execucao_carga.sql:/docker-entrypoint-initdb.d/03_criar_tabelas_execucao_carga.sql:ro
     networks:
       - economia-rede
     healthcheck:
@@ -77,7 +78,40 @@ services:
     networks:
       - economia-rede
 
-  # Aplicacao de Carga de Dados
+  # Worker de Carga de Dados (execucao automatica)
+  economia-worker:
+    container_name: economia-worker
+    build:
+      context: .
+      dockerfile: EconomIA.CargaDeDados/Dockerfile
+    ports:
+      - "5100:5100"
+    environment:
+      - ConnectionStrings__PostgreSQL=Host=economia-postgresql;Port=5432;Database=economia;Username=${POSTGRES__CREDENCIAIS__USER};Password=${POSTGRES__CREDENCIAIS__PASSWORD}
+      - ElasticSearch__Uri=http://economia-elasticsearch:9200
+      - DOTNET_ENVIRONMENT=${DOTNET_ENVIRONMENT:-Development}
+      - Worker__CronExpression=${WORKER__CRON_EXPRESSION:-0 2 * * *}
+      - Worker__DiasRetroativos=${WORKER__DIAS_RETROATIVOS:-1}
+      - Worker__SincronizarOrgaos=${WORKER__SINCRONIZAR_ORGAOS:-true}
+      - Sentry__Enabled=${SENTRY__ENABLED:-false}
+      - Sentry__Dsn=${SENTRY__DSN:-}
+    command: ["worker"]
+    depends_on:
+      economia-postgresql:
+        condition: service_healthy
+      economia-elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - economia-rede
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5100/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # CLI de Carga de Dados (execucao manual)
   economia-carga-de-dados:
     container_name: economia-carga-de-dados
     build:

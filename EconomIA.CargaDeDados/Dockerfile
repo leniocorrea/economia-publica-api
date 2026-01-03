@@ -22,7 +22,8 @@ RUN dotnet build "EconomIA.CargaDeDados.csproj" -c Release -o /app/build
 RUN dotnet publish "EconomIA.CargaDeDados.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+EXPOSE 5100
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "EconomIA.CargaDeDados.dll"]

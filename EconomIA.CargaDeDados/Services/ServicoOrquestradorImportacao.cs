@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using EconomIA.CargaDeDados.Models;
+using EconomIA.CargaDeDados.Observability;
 using EconomIA.CargaDeDados.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace EconomIA.CargaDeDados.Services;
 
@@ -8,88 +11,102 @@ public class ServicoOrquestradorImportacao {
 	private readonly ControlesImportacao controlesImportacao;
 	private readonly ServicoCarga servicoCarga;
 	private readonly ServicoCargaContratosAtas servicoCargaContratosAtas;
+	private readonly ILogger<ServicoOrquestradorImportacao> logger;
 
 	public ServicoOrquestradorImportacao(
 		OrgaosMonitorados orgaosMonitorados,
 		ControlesImportacao controlesImportacao,
 		ServicoCarga servicoCarga,
-		ServicoCargaContratosAtas servicoCargaContratosAtas) {
+		ServicoCargaContratosAtas servicoCargaContratosAtas,
+		ILogger<ServicoOrquestradorImportacao> logger) {
 		this.orgaosMonitorados = orgaosMonitorados;
 		this.controlesImportacao = controlesImportacao;
 		this.servicoCarga = servicoCarga;
 		this.servicoCargaContratosAtas = servicoCargaContratosAtas;
+		this.logger = logger;
 	}
 
-	public async Task ExecutarImportacaoDiariaAsync(String[]? cnpjsFiltro = null, Int32 diasRetroativos = 1) {
-		Console.WriteLine("=== Iniciando Importacao Diaria ===");
-		Console.WriteLine($"Data/Hora: {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
-		Console.WriteLine($"Dias retroativos: {diasRetroativos}");
-		Console.WriteLine();
+	public async Task ExecutarImportacaoDiariaAsync(MetricasExecucao metricas, String[]? cnpjsFiltro = null, Int32 diasRetroativos = 1, CancellationToken cancellationToken = default) {
+		logger.LogInformation("Iniciando importacao diaria. Dias retroativos: {DiasRetroativos}", diasRetroativos);
 
 		var orgaosParaImportar = cnpjsFiltro is not null && cnpjsFiltro.Length > 0
 			? await orgaosMonitorados.ListarPorCnpjsAsync(cnpjsFiltro)
 			: await orgaosMonitorados.ListarAtivosAsync();
 
 		if (orgaosParaImportar.Count == 0) {
-			Console.WriteLine("Nenhum orgao monitorado encontrado para importacao.");
-			Console.WriteLine("Use a API /v1/orgaos-monitorados/{cnpj} para ativar o monitoramento de orgaos.");
+			logger.LogWarning("Nenhum orgao monitorado encontrado para importacao");
 			return;
 		}
 
-		Console.WriteLine($"Total de orgaos monitorados a processar: {orgaosParaImportar.Count}");
-		Console.WriteLine();
+		logger.LogInformation("Total de orgaos monitorados a processar: {TotalOrgaos}", orgaosParaImportar.Count);
 
 		var dataFinal = DateTime.Now;
 		var dataInicial = dataFinal.AddDays(-diasRetroativos);
 
 		foreach (var orgao in orgaosParaImportar) {
-			Console.WriteLine($"=== Processando: {orgao.RazaoSocial} ({orgao.Cnpj}) ===");
+			cancellationToken.ThrowIfCancellationRequested();
 
-			await ImportarComprasDoOrgaoAsync(orgao, dataInicial, dataFinal);
-			await ImportarContratosDoOrgaoAsync(orgao, dataInicial, dataFinal);
-			await ImportarAtasDoOrgaoAsync(orgao, dataInicial, dataFinal);
+			var metricaOrgao = metricas.ObterOuCriarMetricasOrgao(orgao.Identificador);
+			metricaOrgao.DataInicialProcessada = dataInicial;
+			metricaOrgao.DataFinalProcessada = dataFinal;
 
-			Console.WriteLine();
+			logger.LogInformation("Processando orgao: {RazaoSocial} ({Cnpj})", orgao.RazaoSocial, orgao.Cnpj);
+
+			try {
+				await ImportarComprasDoOrgaoAsync(orgao, dataInicial, dataFinal, metricaOrgao);
+				await ImportarContratosDoOrgaoAsync(orgao, dataInicial, dataFinal, metricaOrgao);
+				await ImportarAtasDoOrgaoAsync(orgao, dataInicial, dataFinal, metricaOrgao);
+				metricaOrgao.Finalizar("sucesso");
+			} catch (Exception ex) {
+				logger.LogError(ex, "Erro ao processar orgao {Cnpj}", orgao.Cnpj);
+				metricaOrgao.Finalizar("erro", ex.Message);
+			}
 		}
 
-		Console.WriteLine("=== Importacao Diaria Finalizada ===");
+		logger.LogInformation("Importacao diaria finalizada");
 	}
 
-	public async Task ExecutarImportacaoIncrementalAsync(String[]? cnpjsFiltro = null) {
-		Console.WriteLine("=== Iniciando Importacao Incremental ===");
-		Console.WriteLine($"Data/Hora: {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
-		Console.WriteLine();
+	public async Task ExecutarImportacaoIncrementalAsync(MetricasExecucao metricas, String[]? cnpjsFiltro = null, CancellationToken cancellationToken = default) {
+		logger.LogInformation("Iniciando importacao incremental");
 
 		var orgaosParaImportar = cnpjsFiltro is not null && cnpjsFiltro.Length > 0
 			? await orgaosMonitorados.ListarPorCnpjsAsync(cnpjsFiltro)
 			: await orgaosMonitorados.ListarAtivosAsync();
 
 		if (orgaosParaImportar.Count == 0) {
-			Console.WriteLine("Nenhum orgao monitorado encontrado para importacao.");
-			Console.WriteLine("Use a API /v1/orgaos-monitorados/{cnpj} para ativar o monitoramento de orgaos.");
+			logger.LogWarning("Nenhum orgao monitorado encontrado para importacao");
 			return;
 		}
 
-		Console.WriteLine($"Total de orgaos monitorados a processar: {orgaosParaImportar.Count}");
-		Console.WriteLine();
+		logger.LogInformation("Total de orgaos monitorados a processar: {TotalOrgaos}", orgaosParaImportar.Count);
 
 		var dataFinal = DateTime.Now;
 
 		foreach (var orgao in orgaosParaImportar) {
-			Console.WriteLine($"=== Processando: {orgao.RazaoSocial} ({orgao.Cnpj}) ===");
+			cancellationToken.ThrowIfCancellationRequested();
 
-			await ImportarComprasIncrementalAsync(orgao, dataFinal);
-			await ImportarContratosIncrementalAsync(orgao, dataFinal);
-			await ImportarAtasIncrementalAsync(orgao, dataFinal);
+			var metricaOrgao = metricas.ObterOuCriarMetricasOrgao(orgao.Identificador);
+			metricaOrgao.DataFinalProcessada = dataFinal;
 
-			Console.WriteLine();
+			logger.LogInformation("Processando orgao: {RazaoSocial} ({Cnpj})", orgao.RazaoSocial, orgao.Cnpj);
+
+			try {
+				await ImportarComprasIncrementalAsync(orgao, dataFinal, metricaOrgao);
+				await ImportarContratosIncrementalAsync(orgao, dataFinal, metricaOrgao);
+				await ImportarAtasIncrementalAsync(orgao, dataFinal, metricaOrgao);
+				metricaOrgao.Finalizar("sucesso");
+			} catch (Exception ex) {
+				logger.LogError(ex, "Erro ao processar orgao {Cnpj}", orgao.Cnpj);
+				metricaOrgao.Finalizar("erro", ex.Message);
+			}
 		}
 
-		Console.WriteLine("=== Importacao Incremental Finalizada ===");
+		logger.LogInformation("Importacao incremental finalizada");
 	}
 
-	private async Task ImportarComprasDoOrgaoAsync(OrgaoResumo orgao, DateTime dataInicial, DateTime dataFinal) {
+	private async Task ImportarComprasDoOrgaoAsync(OrgaoResumo orgao, DateTime dataInicial, DateTime dataFinal, MetricasOrgao metricaOrgao) {
 		var tipoDado = TipoDado.Compras;
+		var cronometro = Stopwatch.StartNew();
 
 		try {
 			await controlesImportacao.IniciarImportacaoAsync(orgao.Identificador, tipoDado);
@@ -111,32 +128,41 @@ public class ServicoOrquestradorImportacao {
 				dataFinal,
 				parametros.Count);
 
-			Console.WriteLine($"  [Compras] Importacao concluida: {dataInicial:dd/MM/yyyy} a {dataFinal:dd/MM/yyyy}");
+			cronometro.Stop();
+			metricaOrgao.ComprasDuracaoMs = cronometro.ElapsedMilliseconds;
+			metricaOrgao.ComprasProcessadas++;
+
+			logger.LogDebug("Compras importadas para {Cnpj}: {DataInicial:dd/MM/yyyy} a {DataFinal:dd/MM/yyyy} em {Duracao}ms",
+				orgao.Cnpj, dataInicial, dataFinal, cronometro.ElapsedMilliseconds);
 		} catch (Exception ex) {
+			cronometro.Stop();
+			metricaOrgao.ComprasDuracaoMs = cronometro.ElapsedMilliseconds;
 			await controlesImportacao.FinalizarComErroAsync(orgao.Identificador, tipoDado, ex.Message);
-			Console.WriteLine($"  [Compras] ERRO: {ex.Message}");
+			logger.LogWarning(ex, "Erro ao importar compras do orgao {Cnpj}", orgao.Cnpj);
 		}
 	}
 
-	private async Task ImportarComprasIncrementalAsync(OrgaoResumo orgao, DateTime dataFinal) {
+	private async Task ImportarComprasIncrementalAsync(OrgaoResumo orgao, DateTime dataFinal, MetricasOrgao metricaOrgao) {
 		var tipoDado = TipoDado.Compras;
 		var proximaData = await controlesImportacao.ObterProximaDataParaImportarAsync(orgao.Identificador, tipoDado);
 
 		if (proximaData is null) {
-			Console.WriteLine($"  [Compras] Primeira importacao - usando ultimos 90 dias");
+			logger.LogDebug("Primeira importacao de compras para {Cnpj} - usando ultimos 90 dias", orgao.Cnpj);
 			proximaData = dataFinal.AddDays(-90);
 		}
 
 		if (proximaData > dataFinal) {
-			Console.WriteLine($"  [Compras] Ja esta atualizado ate {dataFinal:dd/MM/yyyy}");
+			logger.LogDebug("Compras de {Cnpj} ja atualizadas ate {DataFinal:dd/MM/yyyy}", orgao.Cnpj, dataFinal);
 			return;
 		}
 
-		await ImportarComprasDoOrgaoAsync(orgao, proximaData.Value, dataFinal);
+		metricaOrgao.DataInicialProcessada = proximaData;
+		await ImportarComprasDoOrgaoAsync(orgao, proximaData.Value, dataFinal, metricaOrgao);
 	}
 
-	private async Task ImportarContratosDoOrgaoAsync(OrgaoResumo orgao, DateTime dataInicial, DateTime dataFinal) {
+	private async Task ImportarContratosDoOrgaoAsync(OrgaoResumo orgao, DateTime dataInicial, DateTime dataFinal, MetricasOrgao metricaOrgao) {
 		var tipoDado = TipoDado.Contratos;
+		var cronometro = Stopwatch.StartNew();
 
 		try {
 			await controlesImportacao.IniciarImportacaoAsync(orgao.Identificador, tipoDado);
@@ -153,32 +179,40 @@ public class ServicoOrquestradorImportacao {
 				dataFinal,
 				0);
 
-			Console.WriteLine($"  [Contratos] Importacao concluida: {dataInicial:dd/MM/yyyy} a {dataFinal:dd/MM/yyyy}");
+			cronometro.Stop();
+			metricaOrgao.ContratosDuracaoMs = cronometro.ElapsedMilliseconds;
+			metricaOrgao.ContratosProcessados++;
+
+			logger.LogDebug("Contratos importados para {Cnpj}: {DataInicial:dd/MM/yyyy} a {DataFinal:dd/MM/yyyy} em {Duracao}ms",
+				orgao.Cnpj, dataInicial, dataFinal, cronometro.ElapsedMilliseconds);
 		} catch (Exception ex) {
+			cronometro.Stop();
+			metricaOrgao.ContratosDuracaoMs = cronometro.ElapsedMilliseconds;
 			await controlesImportacao.FinalizarComErroAsync(orgao.Identificador, tipoDado, ex.Message);
-			Console.WriteLine($"  [Contratos] ERRO: {ex.Message}");
+			logger.LogWarning(ex, "Erro ao importar contratos do orgao {Cnpj}", orgao.Cnpj);
 		}
 	}
 
-	private async Task ImportarContratosIncrementalAsync(OrgaoResumo orgao, DateTime dataFinal) {
+	private async Task ImportarContratosIncrementalAsync(OrgaoResumo orgao, DateTime dataFinal, MetricasOrgao metricaOrgao) {
 		var tipoDado = TipoDado.Contratos;
 		var proximaData = await controlesImportacao.ObterProximaDataParaImportarAsync(orgao.Identificador, tipoDado);
 
 		if (proximaData is null) {
-			Console.WriteLine($"  [Contratos] Primeira importacao - usando ultimos 90 dias");
+			logger.LogDebug("Primeira importacao de contratos para {Cnpj} - usando ultimos 90 dias", orgao.Cnpj);
 			proximaData = dataFinal.AddDays(-90);
 		}
 
 		if (proximaData > dataFinal) {
-			Console.WriteLine($"  [Contratos] Ja esta atualizado ate {dataFinal:dd/MM/yyyy}");
+			logger.LogDebug("Contratos de {Cnpj} ja atualizados ate {DataFinal:dd/MM/yyyy}", orgao.Cnpj, dataFinal);
 			return;
 		}
 
-		await ImportarContratosDoOrgaoAsync(orgao, proximaData.Value, dataFinal);
+		await ImportarContratosDoOrgaoAsync(orgao, proximaData.Value, dataFinal, metricaOrgao);
 	}
 
-	private async Task ImportarAtasDoOrgaoAsync(OrgaoResumo orgao, DateTime dataInicial, DateTime dataFinal) {
+	private async Task ImportarAtasDoOrgaoAsync(OrgaoResumo orgao, DateTime dataInicial, DateTime dataFinal, MetricasOrgao metricaOrgao) {
 		var tipoDado = TipoDado.Atas;
+		var cronometro = Stopwatch.StartNew();
 
 		try {
 			await controlesImportacao.IniciarImportacaoAsync(orgao.Identificador, tipoDado);
@@ -195,33 +229,39 @@ public class ServicoOrquestradorImportacao {
 				dataFinal,
 				0);
 
-			Console.WriteLine($"  [Atas] Importacao concluida: {dataInicial:dd/MM/yyyy} a {dataFinal:dd/MM/yyyy}");
+			cronometro.Stop();
+			metricaOrgao.AtasDuracaoMs = cronometro.ElapsedMilliseconds;
+			metricaOrgao.AtasProcessadas++;
+
+			logger.LogDebug("Atas importadas para {Cnpj}: {DataInicial:dd/MM/yyyy} a {DataFinal:dd/MM/yyyy} em {Duracao}ms",
+				orgao.Cnpj, dataInicial, dataFinal, cronometro.ElapsedMilliseconds);
 		} catch (Exception ex) {
+			cronometro.Stop();
+			metricaOrgao.AtasDuracaoMs = cronometro.ElapsedMilliseconds;
 			await controlesImportacao.FinalizarComErroAsync(orgao.Identificador, tipoDado, ex.Message);
-			Console.WriteLine($"  [Atas] ERRO: {ex.Message}");
+			logger.LogWarning(ex, "Erro ao importar atas do orgao {Cnpj}", orgao.Cnpj);
 		}
 	}
 
-	private async Task ImportarAtasIncrementalAsync(OrgaoResumo orgao, DateTime dataFinal) {
+	private async Task ImportarAtasIncrementalAsync(OrgaoResumo orgao, DateTime dataFinal, MetricasOrgao metricaOrgao) {
 		var tipoDado = TipoDado.Atas;
 		var proximaData = await controlesImportacao.ObterProximaDataParaImportarAsync(orgao.Identificador, tipoDado);
 
 		if (proximaData is null) {
-			Console.WriteLine($"  [Atas] Primeira importacao - usando ultimos 90 dias");
+			logger.LogDebug("Primeira importacao de atas para {Cnpj} - usando ultimos 90 dias", orgao.Cnpj);
 			proximaData = dataFinal.AddDays(-90);
 		}
 
 		if (proximaData > dataFinal) {
-			Console.WriteLine($"  [Atas] Ja esta atualizado ate {dataFinal:dd/MM/yyyy}");
+			logger.LogDebug("Atas de {Cnpj} ja atualizadas ate {DataFinal:dd/MM/yyyy}", orgao.Cnpj, dataFinal);
 			return;
 		}
 
-		await ImportarAtasDoOrgaoAsync(orgao, proximaData.Value, dataFinal);
+		await ImportarAtasDoOrgaoAsync(orgao, proximaData.Value, dataFinal, metricaOrgao);
 	}
 
 	public async Task ExibirStatusImportacaoAsync(String[]? cnpjsFiltro = null) {
-		Console.WriteLine("=== Status de Importacao (Orgaos Monitorados) ===");
-		Console.WriteLine();
+		logger.LogInformation("=== Status de Importacao (Orgaos Monitorados) ===");
 
 		var orgaosParaExibir = cnpjsFiltro is not null && cnpjsFiltro.Length > 0
 			? await orgaosMonitorados.ListarPorCnpjsAsync(cnpjsFiltro)
@@ -237,10 +277,10 @@ public class ServicoOrquestradorImportacao {
 			} else {
 				foreach (var controle in controles) {
 					var dataInicial = controle.DataInicialImportada?.ToString("dd/MM/yyyy") ?? "N/A";
-					var dataFinal = controle.DataFinalImportada?.ToString("dd/MM/yyyy") ?? "N/A";
+					var dataFinalControle = controle.DataFinalImportada?.ToString("dd/MM/yyyy") ?? "N/A";
 					var status = controle.Status.ToUpper();
 
-					Console.WriteLine($"  [{controle.TipoDado}] {dataInicial} a {dataFinal} | Status: {status}");
+					Console.WriteLine($"  [{controle.TipoDado}] {dataInicial} a {dataFinalControle} | Status: {status}");
 
 					if (controle.Status == StatusImportacao.Erro && !String.IsNullOrEmpty(controle.MensagemErro)) {
 						Console.WriteLine($"    Erro: {controle.MensagemErro}");
