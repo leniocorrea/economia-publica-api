@@ -12,17 +12,19 @@ namespace EconomIA.Endpoints.OrgaosMonitorados;
 
 public static class MonitorarOrgaoEndpoint {
 	public static IEndpointRouteBuilder MapMonitorarOrgao(this IEndpointRouteBuilder app) {
-		app.MapPost("/v1/orgaos-monitorados/{cnpj}", Handle)
+		app.MapPost("/v1/orgaos-monitorados", Handle)
 			.WithName("MonitorarOrgao")
 			.WithTags("Órgãos Monitorados");
 
 		return app;
 	}
 
-	private static async Task<IResult> Handle([FromServices] IMediator mediator, [FromRoute] String cnpj) {
-		var command = new MonitorarOrgao.Command(cnpj);
+	private record Request(String Cnpj);
+
+	private static async Task<IResult> Handle([FromServices] IMediator mediator, [FromBody] Request request) {
+		var command = new MonitorarOrgao.Command(request.Cnpj);
 		var result = await mediator.Send(command);
 
-		return result.ToCreated($"/v1/orgaos-monitorados/{cnpj}");
+		return result.ToCreated($"/v1/orgaos-monitorados/{request.Cnpj}");
 	}
 }

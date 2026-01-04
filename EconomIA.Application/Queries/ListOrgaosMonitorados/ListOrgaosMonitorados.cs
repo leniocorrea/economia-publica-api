@@ -12,7 +12,7 @@ using static EconomIA.Domain.Results.EconomIAErrorCodes;
 namespace EconomIA.Application.Queries.ListOrgaosMonitorados;
 
 public static class ListOrgaosMonitorados {
-	public record Query(Boolean? ApenasAtivos, String? Order, String? Cursor, Int32? Limit) : IQuery<Response>;
+	public record Query(Boolean? ApenasAtivos, String? Search, String? Order, String? Cursor, Int32? Limit) : IQuery<Response>;
 
 	public record Response(Response.Item[] Items, Boolean HasMoreItems, String? NextCursor) {
 		public record Item(
@@ -39,6 +39,10 @@ public static class ListOrgaosMonitorados {
 
 			if (query.ApenasAtivos == true) {
 				filter = OrgaosMonitoradosSpecifications.Ativos();
+			}
+
+			if (!String.IsNullOrWhiteSpace(query.Search)) {
+				filter = filter.And(OrgaosMonitoradosSpecifications.ComTermo(query.Search));
 			}
 
 			var result = await orgaosMonitorados.Paginate(pagination, filter, cancellationToken);

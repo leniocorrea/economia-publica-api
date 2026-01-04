@@ -23,10 +23,11 @@ public static class ListOrgaosMonitoradosEndpoint {
 	private static async Task<IResult> Handle(
 		[FromServices] IMediator mediator,
 		[FromQuery] Boolean? apenasAtivos,
+		[FromQuery] String? search,
 		[FromQuery] String? order,
 		[FromQuery] String? cursor,
 		[FromQuery] Int32? limit) {
-		var query = new ListOrgaosMonitorados.Query(apenasAtivos, order, cursor, limit);
+		var query = new ListOrgaosMonitorados.Query(apenasAtivos, search, order, cursor, limit);
 		var result = await mediator.Send(query);
 
 		return result.ToOk(Response.From);

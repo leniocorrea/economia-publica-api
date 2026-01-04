@@ -7,11 +7,13 @@ using EconomIA.Adapters.Persistence.Repositories.Contratos;
 using EconomIA.Adapters.Persistence.Repositories.ItensDaCompra;
 using EconomIA.Adapters.Persistence.Repositories.Orgaos;
 using EconomIA.Adapters.Persistence.Repositories.OrgaosMonitorados;
+using EconomIA.Adapters.Persistence.Repositories.ExecucoesCarga;
 using EconomIA.Application.Queries.ListOrgaos;
 using EconomIA.Domain.Repositories;
 using EconomIA.Endpoints.ItensDaCompra;
 using EconomIA.Endpoints.Orgaos;
 using EconomIA.Endpoints.OrgaosMonitorados;
+using EconomIA.Endpoints.Execucoes;
 using Elastic.Clients.Elasticsearch;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Json;
@@ -25,6 +27,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<JsonOptions>(options => {
 	options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
 	options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never;
+});
+
+builder.Services.AddCors(options => {
+	options.AddDefaultPolicy(policy => {
+		policy.AllowAnyOrigin()
+			.AllowAnyMethod()
+			.AllowAnyHeader();
+	});
 });
 
 builder.Services.AddMediatR(configuration => {
@@ -54,6 +64,7 @@ builder.Services.AddScoped<IAtasReader, AtasQueryRepository>();
 builder.Services.AddScoped<IContratosReader, ContratosQueryRepository>();
 builder.Services.AddScoped<IOrgaosMonitoradosReader, OrgaosMonitoradosQueryRepository>();
 builder.Services.AddScoped<IOrgaosMonitorados, OrgaosMonitoradosCommandRepository>();
+builder.Services.AddScoped<IExecucoesCargaReader, ExecucoesCargaQueryRepository>();
 
 var app = builder.Build();
 
@@ -78,9 +89,12 @@ using (var scope = app.Services.CreateScope()) {
 	}
 }
 
-app.MapGet("/", () => "EconomIA API v1.0.5");
+app.UseCors();
+
+app.MapGet("/", () => "EconomIA API v1.0.7");
 app.MapOrgaosEndpoints();
 app.MapItensDaCompraEndpoints();
 app.MapOrgaosMonitoradosEndpoints();
+app.MapExecucoesEndpoints();
 
 app.Run();

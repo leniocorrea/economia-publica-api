@@ -30,4 +30,11 @@ public static class RepositoryErrorExtensions {
 			_ => new EconomIAApplicationError(InvalidOrgaoMonitoradoRequest, error.Message),
 		};
 	}
+
+	public static HandlerResultError ToExecucaoCargaError(this RepositoryError error) {
+		return error.Code switch {
+			NotFound => new EconomIAApplicationError(ExecucaoCargaNotFound, error.Message),
+			_ => new EconomIAApplicationError(InvalidExecucaoCargaRequest, error.Message),
+		};
+	}
 }

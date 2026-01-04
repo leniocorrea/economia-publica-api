@@ -15,6 +15,7 @@ public static class OrgaosMonitoradosSpecifications {
 	public static Specification<OrgaoMonitorado> ComOrgao(Int64 identificadorDoOrgao) => new ComOrgao(identificadorDoOrgao);
 	public static Specification<OrgaoMonitorado> Ativos() => new Ativos();
 	public static Specification<OrgaoMonitorado> Inativos() => new Inativos();
+	public static Specification<OrgaoMonitorado> ComTermo(String termo) => new ComTermo(termo);
 }
 
 file class All : Specification<OrgaoMonitorado> {
@@ -35,4 +36,12 @@ file class Ativos : Specification<OrgaoMonitorado> {
 
 file class Inativos : Specification<OrgaoMonitorado> {
 	public override Expression<Func<OrgaoMonitorado, Boolean>> Rule() => x => !x.Ativo;
+}
+
+file class ComTermo(String termo) : Specification<OrgaoMonitorado> {
+	public override Expression<Func<OrgaoMonitorado, Boolean>> Rule() =>
+		x => x.Orgao != null && (
+			x.Orgao.RazaoSocial.ToLower().Contains(termo.ToLower()) ||
+			(x.Orgao.NomeFantasia != null && x.Orgao.NomeFantasia.ToLower().Contains(termo.ToLower())) ||
+			x.Orgao.Cnpj.Contains(termo));
 }

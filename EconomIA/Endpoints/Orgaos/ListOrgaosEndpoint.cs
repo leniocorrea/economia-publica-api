@@ -23,10 +23,11 @@ public static class ListOrgaosEndpoint {
 	private static async Task<IResult> Handle(
 		[FromServices] IMediator mediator,
 		[FromQuery] String? cnpj,
+		[FromQuery] String? search,
 		[FromQuery] String? order,
 		[FromQuery] String? cursor,
 		[FromQuery] Int32? limit) {
-		var result = await mediator.Send(new ListOrgaos.Query(cnpj, order, cursor, limit));
+		var result = await mediator.Send(new ListOrgaos.Query(cnpj, search, order, cursor, limit));
 
 		return result.ToOk(Response.From);
 	}

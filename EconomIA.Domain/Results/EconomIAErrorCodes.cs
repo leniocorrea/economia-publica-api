@@ -40,6 +40,12 @@ public enum EconomIAErrorCodes {
 
 	[Description("Invalid órgão monitorado request.")]
 	InvalidOrgaoMonitoradoRequest,
+
+	[Description("Execução de carga not found.")]
+	ExecucaoCargaNotFound,
+
+	[Description("Invalid execução de carga request.")]
+	InvalidExecucaoCargaRequest,
 }
 
 public static class EconomIAErrorCodesExtensions {

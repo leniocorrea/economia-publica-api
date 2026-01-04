@@ -70,6 +70,11 @@ public abstract class ReadRepository<TAggregate> : IReadRepository<TAggregate> w
 		query = query.Where(filter.Rule());
 		query = query.OrderBy(x => x.Id);
 
+		if (!String.IsNullOrWhiteSpace(page.Cursor)) {
+			var cursorId = BitConverter.ToInt64(Convert.FromBase64String(page.Cursor));
+			query = query.Where(x => x.Id > cursorId);
+		}
+
 		var items = await List(query.Take(page.Limit + 1), cancellationToken);
 		var hasMore = items.Length > page.Limit;
 		var resultItems = hasMore ? items.Take(page.Limit).ToArray() : items;

@@ -12,7 +12,7 @@ using static EconomIA.Domain.Results.EconomIAErrorCodes;
 namespace EconomIA.Application.Queries.ListOrgaos;
 
 public static class ListOrgaos {
-	public record Query(String? Cnpj, String? Order, String? Cursor, Int32? Limit) : IQuery<Response>;
+	public record Query(String? Cnpj, String? Search, String? Order, String? Cursor, Int32? Limit) : IQuery<Response>;
 
 	public record Response(Response.Item[] Items, Boolean HasMoreItems, String? NextCursor) {
 		public record Item(
@@ -54,6 +54,8 @@ public static class ListOrgaos {
 
 			if (!String.IsNullOrWhiteSpace(query.Cnpj)) {
 				filter = OrgaosSpecifications.WithCnpj(query.Cnpj);
+			} else if (!String.IsNullOrWhiteSpace(query.Search)) {
+				filter = OrgaosSpecifications.ComNome(query.Search);
 			}
 
 			var result = await orgaos.Paginate(pagination, filter, cancellationToken);
