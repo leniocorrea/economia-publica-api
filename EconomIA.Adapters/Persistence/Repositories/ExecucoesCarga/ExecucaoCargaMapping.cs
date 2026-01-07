@@ -20,11 +20,14 @@ public class ExecucaoCargaMapping : AggregateMapping<ExecucaoCarga> {
 			.IsRequired();
 
 		builder.Property(x => x.InicioEm)
-			.HasColumnName("inicio_em")
-			.IsRequired();
+			.HasColumnName("inicio_em");
 
 		builder.Property(x => x.FimEm)
 			.HasColumnName("fim_em");
+
+		builder.Property(x => x.ParametrosJson)
+			.HasColumnName("parametros")
+			.HasColumnType("jsonb");
 
 		builder.Property(x => x.DuracaoTotalMs)
 			.HasColumnName("duracao_total_ms");

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using EconomIA.Common.Domain;
 
 namespace EconomIA.Domain;
@@ -7,7 +8,7 @@ namespace EconomIA.Domain;
 public class ExecucaoCarga : Aggregate {
 	public String ModoExecucao { get; set; } = String.Empty;
 	public String TipoGatilho { get; set; } = String.Empty;
-	public DateTime InicioEm { get; set; }
+	public DateTime? InicioEm { get; set; }
 	public DateTime? FimEm { get; set; }
 	public Int64? DuracaoTotalMs { get; set; }
 	public String Status { get; set; } = String.Empty;
@@ -22,8 +23,48 @@ public class ExecucaoCarga : Aggregate {
 	public String? VersaoAplicacao { get; set; }
 	public String? Hostname { get; set; }
 	public DateTime CriadoEm { get; set; }
+	public String? ParametrosJson { get; set; }
 
 	public ICollection<ExecucaoCargaOrgao> Orgaos { get; set; } = new List<ExecucaoCargaOrgao>();
+
+	public static ExecucaoCarga CriarPendente(String modoExecucao, String tipoGatilho, ParametrosExecucao? parametros = null) {
+		return new ExecucaoCarga {
+			ModoExecucao = modoExecucao,
+			TipoGatilho = tipoGatilho,
+			Status = StatusExecucao.Pendente,
+			ParametrosJson = parametros is not null ? JsonSerializer.Serialize(parametros) : null,
+			VersaoAplicacao = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
+			Hostname = Environment.MachineName,
+			CriadoEm = DateTime.UtcNow
+		};
+	}
+}
+
+public record ParametrosExecucao(
+	Int32? DiasRetroativos,
+	String[]? Cnpjs
+);
+
+public static class StatusExecucao {
+	public const String Pendente = "pendente";
+	public const String EmAndamento = "em_andamento";
+	public const String Sucesso = "sucesso";
+	public const String Erro = "erro";
+	public const String Parcial = "parcial";
+	public const String Cancelado = "cancelado";
+}
+
+public static class ModoExecucaoTipo {
+	public const String Diaria = "diaria";
+	public const String Incremental = "incremental";
+	public const String Manual = "manual";
+	public const String Orgaos = "orgaos";
+}
+
+public static class TipoGatilhoTipo {
+	public const String Scheduler = "scheduler";
+	public const String Cli = "cli";
+	public const String Api = "api";
 }
 
 public class ExecucaoCargaOrgao : Entity {

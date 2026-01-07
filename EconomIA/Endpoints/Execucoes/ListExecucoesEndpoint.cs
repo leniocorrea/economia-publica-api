@@ -64,7 +64,7 @@ public static class ListExecucoesEndpoint {
 			Int64 Id,
 			String ModoExecucao,
 			String TipoGatilho,
-			DateTime InicioEm,
+			DateTime? InicioEm,
 			DateTime? FimEm,
 			Int64? DuracaoTotalMs,
 			String Status,

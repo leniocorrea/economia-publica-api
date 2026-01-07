@@ -35,6 +35,7 @@ public class Program {
 
 		builder.Services.AddHostedService<CargaDiariaWorker>();
 		builder.Services.AddHostedService<SincronizacaoOrgaosWorker>();
+		builder.Services.AddHostedService<ExecucaoManualWorker>();
 
 		var connectionString = builder.Configuration.GetConnectionString("PostgreSQL")!;
 		builder.Services.AddHealthChecks()

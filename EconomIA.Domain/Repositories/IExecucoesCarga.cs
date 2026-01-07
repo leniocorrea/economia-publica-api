@@ -1,9 +1,20 @@
 using System;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using EconomIA.Common.Domain;
 using EconomIA.Common.Persistence;
 
 namespace EconomIA.Domain.Repositories;
+
+public interface IExecucoesCarga : IRepository<ExecucaoCarga> {
+	Task<Result<ExecucaoCarga, RepositoryError>> CriarPendenteAsync(
+		String modoExecucao,
+		String tipoGatilho,
+		ParametrosExecucao? parametros,
+		CancellationToken cancellationToken = default);
+}
 
 public interface IExecucoesCargaReader : IReadRepository<ExecucaoCarga>;
 

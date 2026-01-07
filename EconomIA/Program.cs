@@ -67,6 +67,7 @@ builder.Services.AddScoped<IContratosReader, ContratosQueryRepository>();
 builder.Services.AddScoped<IOrgaosMonitoradosReader, OrgaosMonitoradosQueryRepository>();
 builder.Services.AddScoped<IOrgaosMonitorados, OrgaosMonitoradosCommandRepository>();
 builder.Services.AddScoped<IExecucoesCargaReader, ExecucoesCargaQueryRepository>();
+builder.Services.AddScoped<IExecucoesCarga, ExecucoesCargaCommandRepository>();
 builder.Services.AddScoped<IConfiguracoesCarga, ConfiguracoesCargaCommandRepository>();
 builder.Services.AddScoped<IConfiguracoesCargaReader, ConfiguracoesCargaQueryRepository>();
 

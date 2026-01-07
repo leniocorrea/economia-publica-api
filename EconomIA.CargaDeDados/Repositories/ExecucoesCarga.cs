@@ -272,4 +272,91 @@ public class ExecucoesCarga {
 
 		return await conexao.QueryAsync<ExecucaoCarga>(sql, new { Limite = limite });
 	}
+
+	public async Task<ExecucaoCarga> CriarPendenteAsync(String modoExecucao, String tipoGatilho, ParametrosExecucao? parametros) {
+		var sql = @"
+			INSERT INTO public.execucao_carga (
+				modo_execucao,
+				tipo_gatilho,
+				status,
+				parametros,
+				versao_aplicacao,
+				hostname,
+				criado_em
+			) VALUES (
+				@ModoExecucao,
+				@TipoGatilho,
+				@Status,
+				@Parametros::jsonb,
+				@VersaoAplicacao,
+				@Hostname,
+				NOW()
+			)
+			RETURNING identificador, criado_em;
+		";
+
+		var versao = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+		var hostname = Environment.MachineName;
+
+		var result = await conexao.QueryFirstAsync<(Int64 Identificador, DateTime CriadoEm)>(sql, new {
+			ModoExecucao = modoExecucao,
+			TipoGatilho = tipoGatilho,
+			Status = StatusExecucao.Pendente,
+			Parametros = parametros?.ToJson(),
+			VersaoAplicacao = versao,
+			Hostname = hostname
+		});
+
+		return new ExecucaoCarga {
+			Identificador = result.Identificador,
+			ModoExecucao = modoExecucao,
+			TipoGatilho = tipoGatilho,
+			Status = StatusExecucao.Pendente,
+			ParametrosJson = parametros?.ToJson(),
+			CriadoEm = result.CriadoEm
+		};
+	}
+
+	public async Task<ExecucaoCarga?> ObterProximaPendenteAsync() {
+		var sql = @"
+			SELECT
+				identificador AS Identificador,
+				modo_execucao AS ModoExecucao,
+				tipo_gatilho AS TipoGatilho,
+				inicio_em AS InicioEm,
+				fim_em AS FimEm,
+				duracao_total_ms AS DuracaoTotalMs,
+				status AS Status,
+				mensagem_erro AS MensagemErro,
+				total_orgaos_processados AS TotalOrgaosProcessados,
+				total_orgaos_com_erro AS TotalOrgaosComErro,
+				total_compras_processadas AS TotalComprasProcessadas,
+				total_contratos_processados AS TotalContratosProcessados,
+				total_atas_processadas AS TotalAtasProcessadas,
+				total_itens_indexados AS TotalItensIndexados,
+				parametros AS ParametrosJson,
+				criado_em AS CriadoEm
+			FROM public.execucao_carga
+			WHERE status = @Status
+			ORDER BY criado_em ASC
+			LIMIT 1;
+		";
+
+		return await conexao.QueryFirstOrDefaultAsync<ExecucaoCarga>(sql, new { Status = StatusExecucao.Pendente });
+	}
+
+	public async Task IniciarProcessamentoAsync(Int64 identificador) {
+		var sql = @"
+			UPDATE public.execucao_carga
+			SET
+				status = @Status,
+				inicio_em = NOW()
+			WHERE identificador = @Identificador;
+		";
+
+		await conexao.ExecuteAsync(sql, new {
+			Identificador = identificador,
+			Status = StatusExecucao.EmAndamento
+		});
+	}
 }

@@ -47,6 +47,9 @@ public enum EconomIAErrorCodes {
 	[Description("Invalid execução de carga request.")]
 	InvalidExecucaoCargaRequest,
 
+	[Description("Invalid execução request.")]
+	InvalidExecucaoRequest,
+
 	[Description("Configuração de carga not found.")]
 	ConfiguracaoCargaNotFound,
 

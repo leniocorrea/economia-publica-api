@@ -36,6 +36,15 @@ public static class ResultExtensions {
 		return result.IsSuccess ? TypedResults.Created(location) : MapErrorToResponse(result.Error);
 	}
 
+	public static HttpResult ToCreated<TResponse, TResult>(this Result<TResponse, HandlerResultError> result, Func<TResponse, String> locationBuilder, Func<TResponse, TResult> mapper) {
+		if (result.IsSuccess) {
+			var location = locationBuilder(result.Value);
+			var mappedResult = mapper(result.Value);
+			return TypedResults.Created(location, mappedResult);
+		}
+		return MapErrorToResponse(result.Error);
+	}
+
 	public static HttpResult ToNoContent(this UnitResult<HandlerResultError> result) {
 		return result.IsSuccess ? TypedResults.NoContent() : MapErrorToResponse(result.Error);
 	}

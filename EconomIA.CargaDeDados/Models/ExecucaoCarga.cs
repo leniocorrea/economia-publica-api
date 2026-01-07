@@ -57,9 +57,24 @@ public class ExecucaoCarga {
 
 	[Column("criado_em")]
 	public DateTime CriadoEm { get; set; }
+
+	[Column("parametros")]
+	public String? ParametrosJson { get; set; }
+
+	public ParametrosExecucao? Parametros => String.IsNullOrEmpty(ParametrosJson)
+		? null
+		: System.Text.Json.JsonSerializer.Deserialize<ParametrosExecucao>(ParametrosJson);
+}
+
+public record ParametrosExecucao(
+	Int32? DiasRetroativos,
+	String[]? Cnpjs
+) {
+	public String ToJson() => System.Text.Json.JsonSerializer.Serialize(this);
 }
 
 public static class StatusExecucao {
+	public const String Pendente = "pendente";
 	public const String EmAndamento = "em_andamento";
 	public const String Sucesso = "sucesso";
 	public const String Erro = "erro";
