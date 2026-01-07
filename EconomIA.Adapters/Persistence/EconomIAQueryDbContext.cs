@@ -17,4 +17,5 @@ public class EconomIAQueryDbContext(DbContextOptions<EconomIAQueryDbContext> opt
 	public DbSet<ExecucaoCarga> ExecucoesCarga { get; set; } = null!;
 	public DbSet<ExecucaoCargaOrgao> ExecucoesCargaOrgaos { get; set; } = null!;
 	public DbSet<ConfiguracaoCarga> ConfiguracoesCarga { get; set; } = null!;
+	public DbSet<Usuario> Usuarios { get; set; } = null!;
 }

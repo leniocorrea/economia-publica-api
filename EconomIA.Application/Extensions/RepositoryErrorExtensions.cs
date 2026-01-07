@@ -37,4 +37,11 @@ public static class RepositoryErrorExtensions {
 			_ => new EconomIAApplicationError(InvalidExecucaoCargaRequest, error.Message),
 		};
 	}
+
+	public static HandlerResultError ToUsuarioError(this RepositoryError error) {
+		return error.Code switch {
+			NotFound => new EconomIAApplicationError(UsuarioNotFound, error.Message),
+			_ => new EconomIAApplicationError(InvalidUsuarioRequest, error.Message),
+		};
+	}
 }

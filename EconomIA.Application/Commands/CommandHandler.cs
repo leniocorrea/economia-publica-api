@@ -29,4 +29,7 @@ public abstract class CommandHandler<TCommand, TResponse> : ICommandHandler<TCom
 
 	protected static Result<TResponse, HandlerResultError> Failure<T>(EconomIAErrorCodes code, String message, String? hint = null) =>
 		Result.Failure<TResponse, HandlerResultError>(new EconomIAApplicationError(code, message, hint));
+
+	protected static Result<TResponse, HandlerResultError> Failure<T>(HandlerResultError error) =>
+		Result.Failure<TResponse, HandlerResultError>(error);
 }

@@ -8,6 +8,8 @@
 	<ItemGroup>
 		<PackageReference Include="Fody" PrivateAssets="all" />
 		<PackageReference Include="Mediatr" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+		<PackageReference Include="BCrypt.Net-Next" />
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\EconomIA.Adapters\EconomIA.Adapters.csproj" />

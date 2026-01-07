@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using EconomIA.Adapters.Persistence;
 using EconomIA.Adapters.Persistence.Repositories.Atas;
@@ -9,20 +10,27 @@ using EconomIA.Adapters.Persistence.Repositories.Orgaos;
 using EconomIA.Adapters.Persistence.Repositories.OrgaosMonitorados;
 using EconomIA.Adapters.Persistence.Repositories.ExecucoesCarga;
 using EconomIA.Adapters.Persistence.Repositories.ConfiguracoesCarga;
+using EconomIA.Adapters.Persistence.Repositories.Usuarios;
 using EconomIA.Application.Queries.ListOrgaos;
+using EconomIA.Configuration;
 using EconomIA.Domain.Repositories;
+using EconomIA.Endpoints.Auth;
 using EconomIA.Endpoints.ItensDaCompra;
 using EconomIA.Endpoints.Orgaos;
 using EconomIA.Endpoints.OrgaosMonitorados;
 using EconomIA.Endpoints.Execucoes;
 using EconomIA.Endpoints.Configuracao;
+using EconomIA.Endpoints.Usuarios;
+using EconomIA.Services;
 using Elastic.Clients.Elasticsearch;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +50,26 @@ builder.Services.AddCors(options => {
 builder.Services.AddMediatR(configuration => {
 	configuration.RegisterServicesFromAssemblyContaining<ListOrgaos.Query>();
 });
+
+builder.Services.Configure<JwtConfiguration>(builder.Configuration.GetSection(JwtConfiguration.SectionName));
+builder.Services.AddScoped<IServicoDeAutenticacao, ServicoDeAutenticacao>();
+
+var jwtConfig = builder.Configuration.GetSection(JwtConfiguration.SectionName).Get<JwtConfiguration>() ?? new JwtConfiguration();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+	.AddJwtBearer(options => {
+		options.TokenValidationParameters = new TokenValidationParameters {
+			ValidateIssuer = true,
+			ValidateAudience = true,
+			ValidateLifetime = true,
+			ValidateIssuerSigningKey = true,
+			ValidIssuer = jwtConfig.Issuer,
+			ValidAudience = jwtConfig.Audience,
+			IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig.Secret))
+		};
+	});
+
+builder.Services.AddAuthorization();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var elasticsearchUrl = builder.Configuration.GetConnectionString("Elasticsearch") ?? "http://localhost:9200";
@@ -70,6 +98,8 @@ builder.Services.AddScoped<IExecucoesCargaReader, ExecucoesCargaQueryRepository>
 builder.Services.AddScoped<IExecucoesCarga, ExecucoesCargaCommandRepository>();
 builder.Services.AddScoped<IConfiguracoesCarga, ConfiguracoesCargaCommandRepository>();
 builder.Services.AddScoped<IConfiguracoesCargaReader, ConfiguracoesCargaQueryRepository>();
+builder.Services.AddScoped<IUsuariosReader, UsuariosQueryRepository>();
+builder.Services.AddScoped<IUsuarios, UsuariosCommandRepository>();
 
 var app = builder.Build();
 
@@ -95,8 +125,12 @@ using (var scope = app.Services.CreateScope()) {
 }
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/", () => "EconomIA API v1.0.7");
+app.MapGet("/", () => "EconomIA API v1.0.8");
+app.MapAuthEndpoints();
+app.MapUsuariosEndpoints();
 app.MapOrgaosEndpoints();
 app.MapItensDaCompraEndpoints();
 app.MapOrgaosMonitoradosEndpoints();

@@ -2,6 +2,7 @@ using System;
 using EconomIA.Common.EntityFramework;
 using EconomIA.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EconomIA.Adapters.Persistence;
 
@@ -17,9 +18,11 @@ public class EconomIACommandDbContext(DbContextOptions<EconomIACommandDbContext>
 	public DbSet<ExecucaoCarga> ExecucoesCarga { get; set; } = null!;
 	public DbSet<ExecucaoCargaOrgao> ExecucoesCargaOrgaos { get; set; } = null!;
 	public DbSet<ConfiguracaoCarga> ConfiguracoesCarga { get; set; } = null!;
+	public DbSet<Usuario> Usuarios { get; set; } = null!;
 
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) {
 		base.OnConfiguring(optionsBuilder);
 		optionsBuilder.UseQueryTrackingBehavior(QueryTrackingBehavior.TrackAll);
+		optionsBuilder.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
 	}
 }

@@ -16,16 +16,22 @@ public static class ResultExtensions {
 		[OrgaoNotFound] = NotFound,
 		[OrgaoMonitoradoNotFound] = NotFound,
 		[ConfiguracaoCargaNotFound] = NotFound,
+		[UsuarioNotFound] = NotFound,
 
 		[MultipleOrgaosFound] = Conflict,
 		[OrgaoMonitoradoAlreadyExists] = Conflict,
+		[UsuarioAlreadyExists] = Conflict,
 
 		[ArgumentNotProvided] = BadRequest,
 		[InvalidArgument] = BadRequest,
 		[InvalidOrgaoRequest] = BadRequest,
 		[InvalidOrgaoMonitoradoRequest] = BadRequest,
 		[InvalidConfiguracaoCargaRequest] = BadRequest,
+		[InvalidUsuarioRequest] = BadRequest,
 		[OtherError] = BadRequest,
+
+		[InvalidCredentials] = Unauthorized,
+		[UsuarioInativo] = Unauthorized,
 	};
 
 	public static HttpResult ToOk<TResponse, TResult>(this Result<TResponse, HandlerResultError> result, Func<TResponse, TResult> mapper) {
@@ -101,5 +107,15 @@ public static class ResultExtensions {
 			Detail = error.ResultError.ToProblemString(),
 			Extensions = CreateExtensions(error),
 		});
+	}
+
+	private static HttpResult Unauthorized(HandlerResultError error) {
+		return TypedResults.Json(
+			new ProblemDetails {
+				Status = (Int32)HttpStatusCode.Unauthorized,
+				Detail = error.ResultError.ToProblemString(),
+				Extensions = CreateExtensions(error),
+			},
+			statusCode: (Int32)HttpStatusCode.Unauthorized);
 	}
 }

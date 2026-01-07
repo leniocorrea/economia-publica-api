@@ -55,6 +55,21 @@ public enum EconomIAErrorCodes {
 
 	[Description("Invalid configuração de carga request.")]
 	InvalidConfiguracaoCargaRequest,
+
+	[Description("Usuário not found.")]
+	UsuarioNotFound,
+
+	[Description("Usuário already exists.")]
+	UsuarioAlreadyExists,
+
+	[Description("Invalid usuário request.")]
+	InvalidUsuarioRequest,
+
+	[Description("Invalid credentials.")]
+	InvalidCredentials,
+
+	[Description("User is not active.")]
+	UsuarioInativo,
 }
 
 public static class EconomIAErrorCodesExtensions {

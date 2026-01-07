@@ -1059,6 +1059,77 @@ namespace EconomIA.Adapters.Persistence.Migrations
                     b.ToTable("unidade", (string)null);
                 });
 
+            modelBuilder.Entity("EconomIA.Domain.Usuario", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("identificador");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("atualizado_em");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("email");
+
+                    b.Property<Guid>("IdentificadorExterno")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identificador_externo");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("Perfil")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("administrador")
+                        .HasColumnName("perfil");
+
+                    b.Property<string>("SenhaHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("senha_hash");
+
+                    b.Property<DateTime?>("UltimoAcesso")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ultimo_acesso");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usuario");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("un_usuario_email");
+
+                    b.HasIndex("IdentificadorExterno")
+                        .IsUnique()
+                        .HasDatabaseName("un_usuario_identificador_externo");
+
+                    b.ToTable("usuario", (string)null);
+                });
+
             modelBuilder.Entity("EconomIA.Domain.Ata", b =>
                 {
                     b.HasOne("EconomIA.Domain.Orgao", "Orgao")
