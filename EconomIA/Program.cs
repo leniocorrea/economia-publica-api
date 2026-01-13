@@ -21,6 +21,8 @@ using EconomIA.Endpoints.OrgaosMonitorados;
 using EconomIA.Endpoints.Execucoes;
 using EconomIA.Endpoints.Configuracao;
 using EconomIA.Endpoints.Usuarios;
+using EconomIA.Endpoints.Notificacoes;
+using EconomIA.Hubs;
 using EconomIA.Services;
 using Elastic.Clients.Elasticsearch;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,11 +43,20 @@ builder.Services.Configure<JsonOptions>(options => {
 
 builder.Services.AddCors(options => {
 	options.AddDefaultPolicy(policy => {
-		policy.AllowAnyOrigin()
+		policy.WithOrigins(
+				"http://localhost:5173",
+				"http://localhost:3000",
+				"http://127.0.0.1:5173",
+				"http://136.113.233.79",
+				"https://136.113.233.79"
+			)
 			.AllowAnyMethod()
-			.AllowAnyHeader();
+			.AllowAnyHeader()
+			.AllowCredentials();
 	});
 });
+
+builder.Services.AddSignalR();
 
 builder.Services.AddMediatR(configuration => {
 	configuration.RegisterServicesFromAssemblyContaining<ListOrgaos.Query>();
@@ -53,6 +64,7 @@ builder.Services.AddMediatR(configuration => {
 
 builder.Services.Configure<JwtConfiguration>(builder.Configuration.GetSection(JwtConfiguration.SectionName));
 builder.Services.AddScoped<IServicoDeAutenticacao, ServicoDeAutenticacao>();
+builder.Services.AddScoped<IServicoDeNotificacoes, ServicoDeNotificacoes>();
 
 var jwtConfig = builder.Configuration.GetSection(JwtConfiguration.SectionName).Get<JwtConfiguration>() ?? new JwtConfiguration();
 
@@ -66,6 +78,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 			ValidIssuer = jwtConfig.Issuer,
 			ValidAudience = jwtConfig.Audience,
 			IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig.Secret))
+		};
+
+		options.Events = new JwtBearerEvents {
+			OnMessageReceived = context => {
+				var accessToken = context.Request.Query["access_token"];
+
+				var path = context.HttpContext.Request.Path;
+
+				if (!String.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs")) {
+					context.Token = accessToken;
+				}
+
+				return System.Threading.Tasks.Task.CompletedTask;
+			}
 		};
 	});
 
@@ -128,7 +154,8 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => "EconomIA API v1.0.8");
+app.MapGet("/", () => "EconomIA API v1.0.9");
+app.MapHub<NotificacoesHub>("/hubs/notificacoes");
 app.MapAuthEndpoints();
 app.MapUsuariosEndpoints();
 app.MapOrgaosEndpoints();
@@ -136,5 +163,6 @@ app.MapItensDaCompraEndpoints();
 app.MapOrgaosMonitoradosEndpoints();
 app.MapExecucoesEndpoints();
 app.MapConfiguracaoEndpoints();
+app.MapNotificacoesEndpoints();
 
 app.Run();

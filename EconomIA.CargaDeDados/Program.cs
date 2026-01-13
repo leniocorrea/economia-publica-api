@@ -205,6 +205,16 @@ public class Program {
 				}));
 
 		services.AddTransient<ServicoOrquestradorImportacao>();
+
+		var apiBaseUrl = configuration["Api:BaseUrl"];
+
+		if (!String.IsNullOrEmpty(apiBaseUrl)) {
+			services.AddHttpClient<IClienteDeNotificacoes, ClienteDeNotificacoes>(client => {
+				client.BaseAddress = new Uri(apiBaseUrl);
+			});
+		} else {
+			services.AddSingleton<IClienteDeNotificacoes, ClienteDeNotificacoesDesabilitado>();
+		}
 	}
 
 	private static String[]? ObterCnpjsFiltro(String[] args) {

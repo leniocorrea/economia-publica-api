@@ -58,8 +58,10 @@ public class ExecucaoManualWorker : BackgroundService {
 
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
 		var orquestrador = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
+		var clienteNotificacoes = servicos.GetRequiredService<IClienteDeNotificacoes>();
 
 		await execucoesCarga.IniciarProcessamentoAsync(execucao.Identificador);
+		await clienteNotificacoes.NotificarExecucaoIniciadaAsync(execucao);
 
 		WorkerHealthCheck.RegistrarInicioExecucao(execucao.Identificador);
 
@@ -83,6 +85,7 @@ public class ExecucaoManualWorker : BackgroundService {
 			}
 
 			await execucoesCarga.FinalizarComSucessoAsync(execucao.Identificador, metricas);
+			await clienteNotificacoes.NotificarExecucaoFinalizadaAsync(execucao, metricas);
 
 			logger.LogInformation(
 				"Execucao manual finalizada. ID: {ExecucaoId}, Orgaos: {TotalOrgaos}, Compras: {TotalCompras}, Contratos: {TotalContratos}, Atas: {TotalAtas}, Duracao: {Duracao}ms",
@@ -97,10 +100,12 @@ public class ExecucaoManualWorker : BackgroundService {
 		} catch (OperationCanceledException) {
 			logger.LogWarning("Execucao manual cancelada. ID: {ExecucaoId}", execucao.Identificador);
 			await execucoesCarga.FinalizarComCancelamentoAsync(execucao.Identificador, metricas);
+			await clienteNotificacoes.NotificarExecucaoErroAsync(execucao, metricas, "Execução cancelada");
 			WorkerHealthCheck.RegistrarFimExecucao(StatusExecucao.Cancelado);
 		} catch (Exception ex) {
 			logger.LogError(ex, "Erro na execucao manual. ID: {ExecucaoId}", execucao.Identificador);
 			await execucoesCarga.FinalizarComErroAsync(execucao.Identificador, ex.Message, ex.StackTrace, metricas);
+			await clienteNotificacoes.NotificarExecucaoErroAsync(execucao, metricas, ex.Message);
 			WorkerHealthCheck.RegistrarFimExecucao(StatusExecucao.Erro);
 		}
 	}
