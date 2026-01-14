@@ -7,8 +7,6 @@ using Microsoft.Extensions.Logging;
 namespace EconomIA.CargaDeDados.Services;
 
 public class ServicoOrquestradorImportacao {
-	private const Int32 MaxOrgaosEmParalelo = 2;
-
 	private readonly OrgaosMonitorados orgaosMonitorados;
 	private readonly ControlesImportacao controlesImportacao;
 	private readonly ServicoCarga servicoCarga;
@@ -29,7 +27,7 @@ public class ServicoOrquestradorImportacao {
 	}
 
 	public async Task ExecutarImportacaoDiariaAsync(MetricasExecucao metricas, String[]? cnpjsFiltro = null, Int32 diasRetroativos = 1, CancellationToken cancellationToken = default) {
-		logger.LogInformation("Iniciando importacao diaria. Dias retroativos: {DiasRetroativos}, Paralelismo: {MaxParalelo}", diasRetroativos, MaxOrgaosEmParalelo);
+		logger.LogInformation("Iniciando importacao diaria. Dias retroativos: {DiasRetroativos}", diasRetroativos);
 
 		var orgaosParaImportar = cnpjsFiltro is not null && cnpjsFiltro.Length > 0
 			? await orgaosMonitorados.ListarPorCnpjsAsync(cnpjsFiltro)
@@ -45,12 +43,9 @@ public class ServicoOrquestradorImportacao {
 		var dataFinal = DateTime.Now;
 		var dataInicial = dataFinal.AddDays(-diasRetroativos);
 
-		var opcoes = new ParallelOptions {
-			MaxDegreeOfParallelism = MaxOrgaosEmParalelo,
-			CancellationToken = cancellationToken
-		};
+		foreach (var orgao in orgaosParaImportar) {
+			cancellationToken.ThrowIfCancellationRequested();
 
-		await Parallel.ForEachAsync(orgaosParaImportar, opcoes, async (orgao, token) => {
 			var metricaOrgao = metricas.ObterOuCriarMetricasOrgao(orgao.Identificador);
 			metricaOrgao.DataInicialProcessada = dataInicial;
 			metricaOrgao.DataFinalProcessada = dataFinal;
@@ -66,13 +61,13 @@ public class ServicoOrquestradorImportacao {
 				logger.LogError(ex, "Erro ao processar orgao {Cnpj}", orgao.Cnpj);
 				metricaOrgao.Finalizar("erro", ex.Message);
 			}
-		});
+		}
 
 		logger.LogInformation("Importacao diaria finalizada");
 	}
 
 	public async Task ExecutarImportacaoIncrementalAsync(MetricasExecucao metricas, String[]? cnpjsFiltro = null, CancellationToken cancellationToken = default) {
-		logger.LogInformation("Iniciando importacao incremental. Paralelismo: {MaxParalelo}", MaxOrgaosEmParalelo);
+		logger.LogInformation("Iniciando importacao incremental");
 
 		var orgaosParaImportar = cnpjsFiltro is not null && cnpjsFiltro.Length > 0
 			? await orgaosMonitorados.ListarPorCnpjsAsync(cnpjsFiltro)
@@ -87,12 +82,9 @@ public class ServicoOrquestradorImportacao {
 
 		var dataFinal = DateTime.Now;
 
-		var opcoes = new ParallelOptions {
-			MaxDegreeOfParallelism = MaxOrgaosEmParalelo,
-			CancellationToken = cancellationToken
-		};
+		foreach (var orgao in orgaosParaImportar) {
+			cancellationToken.ThrowIfCancellationRequested();
 
-		await Parallel.ForEachAsync(orgaosParaImportar, opcoes, async (orgao, token) => {
 			var metricaOrgao = metricas.ObterOuCriarMetricasOrgao(orgao.Identificador);
 			metricaOrgao.DataFinalProcessada = dataFinal;
 
@@ -107,7 +99,7 @@ public class ServicoOrquestradorImportacao {
 				logger.LogError(ex, "Erro ao processar orgao {Cnpj}", orgao.Cnpj);
 				metricaOrgao.Finalizar("erro", ex.Message);
 			}
-		});
+		}
 
 		logger.LogInformation("Importacao incremental finalizada");
 	}
