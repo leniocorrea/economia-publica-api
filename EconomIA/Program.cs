@@ -11,6 +11,7 @@ using EconomIA.Adapters.Persistence.Repositories.OrgaosMonitorados;
 using EconomIA.Adapters.Persistence.Repositories.ExecucoesCarga;
 using EconomIA.Adapters.Persistence.Repositories.ConfiguracoesCarga;
 using EconomIA.Adapters.Persistence.Repositories.Usuarios;
+using EconomIA.Adapters.Persistence.Repositories.Estatisticas;
 using EconomIA.Application.Queries.ListOrgaos;
 using EconomIA.Configuration;
 using EconomIA.Domain.Repositories;
@@ -22,6 +23,7 @@ using EconomIA.Endpoints.Execucoes;
 using EconomIA.Endpoints.Configuracao;
 using EconomIA.Endpoints.Usuarios;
 using EconomIA.Endpoints.Notificacoes;
+using EconomIA.Endpoints.Dashboard;
 using EconomIA.Hubs;
 using EconomIA.Services;
 using Elastic.Clients.Elasticsearch;
@@ -126,6 +128,7 @@ builder.Services.AddScoped<IConfiguracoesCarga, ConfiguracoesCargaCommandReposit
 builder.Services.AddScoped<IConfiguracoesCargaReader, ConfiguracoesCargaQueryRepository>();
 builder.Services.AddScoped<IUsuariosReader, UsuariosQueryRepository>();
 builder.Services.AddScoped<IUsuarios, UsuariosCommandRepository>();
+builder.Services.AddScoped<IEstatisticas, EstatisticasQueryRepository>();
 
 var app = builder.Build();
 
@@ -164,5 +167,6 @@ app.MapOrgaosMonitoradosEndpoints();
 app.MapExecucoesEndpoints();
 app.MapConfiguracaoEndpoints();
 app.MapNotificacoesEndpoints();
+app.MapDashboardEndpoints();
 
 app.Run();
