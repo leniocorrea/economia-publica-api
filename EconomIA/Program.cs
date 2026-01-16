@@ -154,7 +154,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => "EconomIA API v1.0.9");
+app.MapGet("/", () => "EconomIA API v1.0.10");
 app.MapHub<NotificacoesHub>("/hubs/notificacoes");
 app.MapAuthEndpoints();
 app.MapUsuariosEndpoints();
