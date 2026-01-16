@@ -359,4 +359,32 @@ public class ExecucoesCarga {
 			Status = StatusExecucao.EmAndamento
 		});
 	}
+
+	public async Task<Boolean> ExisteExecucaoEmAndamentoAsync() {
+		var sql = @"
+			SELECT EXISTS (
+				SELECT 1 FROM public.execucao_carga
+				WHERE status = @Status
+			);
+		";
+
+		return await conexao.ExecuteScalarAsync<Boolean>(sql, new { Status = StatusExecucao.EmAndamento });
+	}
+
+	public async Task<ExecucaoCarga?> ObterExecucaoEmAndamentoAsync() {
+		var sql = @"
+			SELECT
+				identificador AS Identificador,
+				modo_execucao AS ModoExecucao,
+				tipo_gatilho AS TipoGatilho,
+				inicio_em AS InicioEm,
+				status AS Status
+			FROM public.execucao_carga
+			WHERE status = @Status
+			ORDER BY inicio_em ASC
+			LIMIT 1;
+		";
+
+		return await conexao.QueryFirstOrDefaultAsync<ExecucaoCarga>(sql, new { Status = StatusExecucao.EmAndamento });
+	}
 }

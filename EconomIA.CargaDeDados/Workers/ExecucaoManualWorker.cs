@@ -40,6 +40,15 @@ public class ExecucaoManualWorker : BackgroundService {
 
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
 
+		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+
+		if (execucaoAtiva is not null) {
+			logger.LogDebug(
+				"Execucao em andamento detectada (ID: {ExecucaoId}). Aguardando finalizacao.",
+				execucaoAtiva.Identificador);
+			return;
+		}
+
 		var execucaoPendente = await execucoesCarga.ObterProximaPendenteAsync();
 
 		if (execucaoPendente is null) {

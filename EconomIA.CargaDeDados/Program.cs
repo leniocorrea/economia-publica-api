@@ -95,6 +95,17 @@ public class Program {
 					break;
 
 				case "diaria":
+					var execucaoAtivaDiaria = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+
+					if (execucaoAtivaDiaria is not null) {
+						logger.LogError(
+							"Execucao em andamento detectada (ID: {ExecucaoId}, Modo: {Modo}, Inicio: {Inicio}). Aguarde a finalizacao antes de iniciar nova carga.",
+							execucaoAtivaDiaria.Identificador,
+							execucaoAtivaDiaria.ModoExecucao,
+							execucaoAtivaDiaria.InicioEm);
+						return;
+					}
+
 					var metricsDiaria = new MetricasExecucao();
 					var execucaoDiaria = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Diaria, TipoGatilho.Cli);
 
@@ -109,6 +120,17 @@ public class Program {
 					break;
 
 				case "incremental":
+					var execucaoAtivaIncremental = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+
+					if (execucaoAtivaIncremental is not null) {
+						logger.LogError(
+							"Execucao em andamento detectada (ID: {ExecucaoId}, Modo: {Modo}, Inicio: {Inicio}). Aguarde a finalizacao antes de iniciar nova carga.",
+							execucaoAtivaIncremental.Identificador,
+							execucaoAtivaIncremental.ModoExecucao,
+							execucaoAtivaIncremental.InicioEm);
+						return;
+					}
+
 					var metricsIncremental = new MetricasExecucao();
 					var execucaoIncremental = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Incremental, TipoGatilho.Cli);
 

@@ -64,6 +64,17 @@ public class CargaDiariaWorker : BackgroundService {
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
 		var orquestrador = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
 
+		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+
+		if (execucaoAtiva is not null) {
+			logger.LogWarning(
+				"Execucao em andamento detectada (ID: {ExecucaoId}, Modo: {Modo}, Inicio: {Inicio}). Carga agendada sera ignorada.",
+				execucaoAtiva.Identificador,
+				execucaoAtiva.ModoExecucao,
+				execucaoAtiva.InicioEm);
+			return;
+		}
+
 		var metricas = new MetricasExecucao();
 		var execucao = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Incremental, TipoGatilho.Scheduler);
 
