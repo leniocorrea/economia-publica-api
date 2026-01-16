@@ -50,6 +50,7 @@ services:
     image: ghcr.io/leniocorrea/economia-api:latest
     ports:
       - "8080:8080"
+    restart: unless-stopped
     environment:
       - ConnectionStrings__DefaultConnection=Host=economia-postgresql;Port=5432;Database=economia;Username=${POSTGRES__CREDENCIAIS__USER};Password=${POSTGRES__CREDENCIAIS__PASSWORD}
       - ConnectionStrings__Elasticsearch=http://economia-elasticsearch:9200
@@ -71,19 +72,19 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_POLL_INTERVAL=60
       - WATCHTOWER_LABEL_ENABLE=true
+      - DOCKER_CONFIG=/
     networks:
       - economia-rede
 
   # Worker de Carga de Dados (execucao automatica)
   economia-worker:
     container_name: economia-worker
-    build:
-      context: .
-      dockerfile: EconomIA.CargaDeDados/Dockerfile
+    image: ghcr.io/leniocorrea/economia-worker:latest
     ports:
       - "5100:5100"
     environment:
@@ -110,6 +111,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # CLI de Carga de Dados (execucao manual)
   economia-carga-de-dados:
