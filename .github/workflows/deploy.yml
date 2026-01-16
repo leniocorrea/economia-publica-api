@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'EconomIA/**'
+      - 'EconomIA.*/**'
+      - 'Directory.*.props'
+      - 'Dockerfile'
+      - '.github/workflows/deploy.yml'
 
 env:
   REGISTRY: ghcr.io

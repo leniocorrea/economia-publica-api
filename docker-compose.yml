@@ -65,6 +65,20 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  # Frontend Admin
+  economia-admin:
+    container_name: economia-admin
+    image: ghcr.io/leniocorrea/economia-admin:latest
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    depends_on:
+      - economia-api
+    networks:
+      - economia-rede
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
   # Watchtower - Atualiza containers automaticamente
   watchtower:
     container_name: watchtower
