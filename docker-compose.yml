@@ -14,6 +14,7 @@ services:
       - economia-postgres-data:/var/lib/postgresql/data
       - ./docker/postgresql/01_criar_banco.sql:/docker-entrypoint-initdb.d/01_criar_banco.sql:ro
       - ./docker/postgresql/03_criar_tabelas_execucao_carga.sql:/docker-entrypoint-initdb.d/03_criar_tabelas_execucao_carga.sql:ro
+      - ./docker/postgresql/04_adicionar_modo_brasil.sql:/docker-entrypoint-initdb.d/04_adicionar_modo_brasil.sql:ro
     networks:
       - economia-rede
     healthcheck:
