@@ -11,10 +11,14 @@ public class MetricasExecucao {
 	private Int32? totalContratosOverride;
 	private Int32? totalAtasOverride;
 	private Int32? totalItensOverride;
+	private Int32? totalOrgaosOverride;
 
 	public Int64 DuracaoTotalMs => cronometro.ElapsedMilliseconds;
 
-	public Int32 TotalOrgaosProcessados => metricasPorOrgao.Count;
+	public Int32 TotalOrgaosProcessados {
+		get => totalOrgaosOverride ?? metricasPorOrgao.Count;
+		set => totalOrgaosOverride = value;
+	}
 	public Int32 TotalOrgaosComErro => metricasPorOrgao.Values.Count(x => x.Status == "erro");
 
 	public Int32 TotalComprasProcessadas {

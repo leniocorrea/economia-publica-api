@@ -144,4 +144,53 @@ public class ControlesImportacao {
 
 		return controle.DataFinalImportada.Value.ToDateTime(TimeOnly.MinValue).AddDays(1);
 	}
+
+	public async Task<Int32> BulkAtualizarControleAsync(
+		IEnumerable<Int64> identificadoresOrgaos,
+		String tipoDado,
+		DateTime dataInicial,
+		DateTime dataFinal) {
+
+		var listaIds = identificadoresOrgaos.Distinct().ToList();
+
+		if (listaIds.Count == 0) {
+			return 0;
+		}
+
+		var sql = @"
+			INSERT INTO public.controle_de_importacao (
+				identificador_do_orgao,
+				tipo_dado,
+				data_inicial_importada,
+				data_final_importada,
+				ultima_execucao,
+				registros_importados,
+				status
+			)
+			SELECT
+				unnest(@Ids),
+				@TipoDado,
+				@DataInicial,
+				@DataFinal,
+				now(),
+				0,
+				@Status
+			ON CONFLICT (identificador_do_orgao, tipo_dado) DO UPDATE
+			SET
+				data_inicial_importada = LEAST(COALESCE(controle_de_importacao.data_inicial_importada, EXCLUDED.data_inicial_importada), EXCLUDED.data_inicial_importada),
+				data_final_importada = GREATEST(COALESCE(controle_de_importacao.data_final_importada, EXCLUDED.data_final_importada), EXCLUDED.data_final_importada),
+				ultima_execucao = now(),
+				status = @Status,
+				mensagem_erro = NULL,
+				atualizado_em = now();
+		";
+
+		return await conexao.ExecuteAsync(sql, new {
+			Ids = listaIds.ToArray(),
+			TipoDado = tipoDado,
+			DataInicial = dataInicial,
+			DataFinal = dataFinal,
+			Status = StatusImportacao.Sucesso
+		});
+	}
 }

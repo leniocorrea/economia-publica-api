@@ -185,15 +185,17 @@ public class Program {
 						metricsBrasil.TotalItensIndexados = resultadoBrasil.ItensIndexados;
 						metricsBrasil.TotalContratosProcessados = resultadoBrasil.ContratosProcessados;
 						metricsBrasil.TotalAtasProcessadas = resultadoBrasil.AtasProcessadas;
+						metricsBrasil.TotalOrgaosProcessados = resultadoBrasil.OrgaosProcessados;
 
 						await execucoesCarga.FinalizarComSucessoAsync(execucaoBrasil.Identificador, metricsBrasil);
 
 						logger.LogInformation(
-							"Carga Brasil finalizada. Compras: {Compras}, Itens: {Itens}, Contratos: {Contratos}, Atas: {Atas}, Duracao: {Duracao}ms",
+							"Carga Brasil finalizada. Compras: {Compras}, Itens: {Itens}, Contratos: {Contratos}, Atas: {Atas}, Orgaos: {Orgaos}, Duracao: {Duracao}ms",
 							resultadoBrasil.ComprasProcessadas,
 							resultadoBrasil.ItensIndexados,
 							resultadoBrasil.ContratosProcessados,
 							resultadoBrasil.AtasProcessadas,
+							resultadoBrasil.OrgaosProcessados,
 							resultadoBrasil.DuracaoMs);
 					} catch (Exception ex) {
 						await execucoesCarga.FinalizarComErroAsync(execucaoBrasil.Identificador, ex.Message, ex.StackTrace, metricsBrasil);

@@ -15,6 +15,7 @@ public record ResultadoCargaBrasil(
 	Int32 ItensIndexados,
 	Int32 ContratosProcessados,
 	Int32 AtasProcessadas,
+	Int32 OrgaosProcessados,
 	Int64 DuracaoMs);
 
 public class ServicoCargaBrasil {
@@ -67,32 +68,36 @@ public class ServicoCargaBrasil {
 		var totalItens = 0;
 		var totalContratos = 0;
 		var totalAtas = 0;
+		var orgaosProcessados = new ConcurrentDictionary<Int64, Byte>();
 
 		var modalidades = apenasModalidadesComDados
 			? ModalidadesComDados
 			: Enumerable.Range(1, 14).ToArray();
 
-		var resultadoCompras = await ProcessarComprasBrasilAsync(dataInicialStr, dataFinalStr, modalidades, cancellationToken);
+		var resultadoCompras = await ProcessarComprasBrasilAsync(dataInicialStr, dataFinalStr, modalidades, orgaosProcessados, cancellationToken);
 		totalCompras = resultadoCompras.ComprasProcessadas;
 		totalItens = resultadoCompras.ItensIndexados;
 
-		var resultadoContratos = await ProcessarContratosBrasilAsync(dataInicialStr, dataFinalStr, cancellationToken);
+		var resultadoContratos = await ProcessarContratosBrasilAsync(dataInicialStr, dataFinalStr, orgaosProcessados, cancellationToken);
 		totalContratos = resultadoContratos;
 
-		var resultadoAtas = await ProcessarAtasBrasilAsync(dataInicialStr, dataFinalStr, cancellationToken);
+		var resultadoAtas = await ProcessarAtasBrasilAsync(dataInicialStr, dataFinalStr, orgaosProcessados, cancellationToken);
 		totalAtas = resultadoAtas;
+
+		await AtualizarControlesImportacaoAsync(orgaosProcessados.Keys, dataInicial, dataFinal, cancellationToken);
 
 		cronometro.Stop();
 
 		logger.LogInformation(
-			"Carga Brasil finalizada em {Duracao}ms. Compras: {Compras}, Itens: {Itens}, Contratos: {Contratos}, Atas: {Atas}",
-			cronometro.ElapsedMilliseconds, totalCompras, totalItens, totalContratos, totalAtas);
+			"Carga Brasil finalizada em {Duracao}ms. Compras: {Compras}, Itens: {Itens}, Contratos: {Contratos}, Atas: {Atas}, Orgaos: {Orgaos}",
+			cronometro.ElapsedMilliseconds, totalCompras, totalItens, totalContratos, totalAtas, orgaosProcessados.Count);
 
 		return new ResultadoCargaBrasil(
 			totalCompras,
 			totalItens,
 			totalContratos,
 			totalAtas,
+			orgaosProcessados.Count,
 			cronometro.ElapsedMilliseconds);
 	}
 
@@ -100,6 +105,7 @@ public class ServicoCargaBrasil {
 		String dataInicial,
 		String dataFinal,
 		Int32[] modalidades,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		logger.LogInformation("Processando compras de {QtdModalidades} modalidades em paralelo", modalidades.Length);
@@ -115,7 +121,7 @@ public class ServicoCargaBrasil {
 
 		await Parallel.ForEachAsync(modalidades, opcoes, async (modalidade, token) => {
 			var (compras, itens) = await ProcessarModalidadeAsync(
-				dataInicial, dataFinal, modalidade, bufferElastic, token);
+				dataInicial, dataFinal, modalidade, bufferElastic, orgaosProcessados, token);
 
 			Interlocked.Add(ref totalCompras, compras);
 			Interlocked.Add(ref totalItens, itens);
@@ -133,6 +139,7 @@ public class ServicoCargaBrasil {
 		String dataFinal,
 		Int32 modalidade,
 		ConcurrentBag<ItemDocument> bufferElastic,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		var comprasModalidade = 0;
@@ -175,7 +182,7 @@ public class ServicoCargaBrasil {
 					break;
 				}
 
-				var (compras, itens) = await ProcessarLoteDeComprasAsync(resultado.Data, bufferElastic, cancellationToken);
+				var (compras, itens) = await ProcessarLoteDeComprasAsync(resultado.Data, bufferElastic, orgaosProcessados, cancellationToken);
 				comprasModalidade += compras;
 				itensModalidade += itens;
 
@@ -208,6 +215,7 @@ public class ServicoCargaBrasil {
 	private async Task<(Int32 Compras, Int32 Itens)> ProcessarLoteDeComprasAsync(
 		List<PncpCompraDto> compras,
 		ConcurrentBag<ItemDocument> bufferElastic,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		using var scope = scopeFactory.CreateScope();
@@ -227,6 +235,7 @@ public class ServicoCargaBrasil {
 				};
 
 				var idOrgao = await orgaosRepo.UpsertAsync(modeloOrgao);
+				orgaosProcessados.TryAdd(idOrgao, 0);
 
 				var modeloCompra = new Compra {
 					IdentificadorDoOrgao = idOrgao,
@@ -388,6 +397,7 @@ public class ServicoCargaBrasil {
 	private async Task<Int32> ProcessarContratosBrasilAsync(
 		String dataInicial,
 		String dataFinal,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		logger.LogInformation("Processando contratos de todo o Brasil");
@@ -428,7 +438,7 @@ public class ServicoCargaBrasil {
 					break;
 				}
 
-				var contratosProcessados = await ProcessarLoteDeContratosAsync(resultado.Data, cancellationToken);
+				var contratosProcessados = await ProcessarLoteDeContratosAsync(resultado.Data, orgaosProcessados, cancellationToken);
 				totalContratos += contratosProcessados;
 
 				if (resultado.PaginasRestantes == 0) {
@@ -453,6 +463,7 @@ public class ServicoCargaBrasil {
 
 	private async Task<Int32> ProcessarLoteDeContratosAsync(
 		List<PncpContratoDto> contratos,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		using var scope = scopeFactory.CreateScope();
@@ -469,6 +480,7 @@ public class ServicoCargaBrasil {
 				};
 
 				var idOrgao = await orgaosRepo.UpsertAsync(modeloOrgao);
+				orgaosProcessados.TryAdd(idOrgao, 0);
 
 				var contrato = new Contrato {
 					IdentificadorDoOrgao = idOrgao,
@@ -515,6 +527,7 @@ public class ServicoCargaBrasil {
 	private async Task<Int32> ProcessarAtasBrasilAsync(
 		String dataInicial,
 		String dataFinal,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		logger.LogInformation("Processando atas de todo o Brasil (otimizado)");
@@ -580,7 +593,7 @@ public class ServicoCargaBrasil {
 					totalPaginas = resultado.TotalPaginas;
 				}
 
-				var atasProcessadas = await ProcessarLoteDeAtasComCacheAsync(resultado.Data, cacheOrgaos, cancellationToken);
+				var atasProcessadas = await ProcessarLoteDeAtasComCacheAsync(resultado.Data, cacheOrgaos, orgaosProcessados, cancellationToken);
 				Interlocked.Add(ref totalAtas, atasProcessadas);
 			}
 
@@ -602,6 +615,7 @@ public class ServicoCargaBrasil {
 	private async Task<Int32> ProcessarLoteDeAtasComCacheAsync(
 		List<PncpAtaDto> atas,
 		ConcurrentDictionary<String, Int64> cacheOrgaos,
+		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
 		using var scope = scopeFactory.CreateScope();
@@ -617,6 +631,7 @@ public class ServicoCargaBrasil {
 					ataDto.NomeOrgao ?? "",
 					cacheOrgaos,
 					orgaosRepo);
+				orgaosProcessados.TryAdd(idOrgao, 0);
 
 				var ata = new Ata {
 					IdentificadorDoOrgao = idOrgao,
@@ -665,5 +680,39 @@ public class ServicoCargaBrasil {
 		var idOrgao = await orgaosRepo.UpsertAsync(modeloOrgao);
 		cache[cnpj] = idOrgao;
 		return idOrgao;
+	}
+
+	private async Task AtualizarControlesImportacaoAsync(
+		IEnumerable<Int64> orgaosProcessados,
+		DateTime dataInicial,
+		DateTime dataFinal,
+		CancellationToken cancellationToken) {
+
+		var listaOrgaos = orgaosProcessados.ToList();
+
+		if (listaOrgaos.Count == 0) {
+			return;
+		}
+
+		logger.LogInformation("Atualizando controle de importacao para {Count} orgaos...", listaOrgaos.Count);
+
+		using var scope = scopeFactory.CreateScope();
+		var controlesRepo = scope.ServiceProvider.GetRequiredService<ControlesImportacao>();
+
+		var tiposDados = new[] { "compras", "contratos", "atas" };
+
+		foreach (var tipoDado in tiposDados) {
+			try {
+				var atualizados = await controlesRepo.BulkAtualizarControleAsync(
+					listaOrgaos,
+					tipoDado,
+					dataInicial,
+					dataFinal);
+
+				logger.LogInformation("Controle de {TipoDado} atualizado para {Count} orgaos", tipoDado, atualizados);
+			} catch (Exception ex) {
+				logger.LogError(ex, "Erro ao atualizar controle de importacao para {TipoDado}", tipoDado);
+			}
+		}
 	}
 }
