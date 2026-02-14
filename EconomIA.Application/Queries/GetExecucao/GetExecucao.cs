@@ -56,7 +56,7 @@ public static class GetExecucao {
 
 	public class Handler(IExecucoesCargaReader execucoes) : QueryHandler<Query, Response> {
 		public override async Task<Result<Response, HandlerResultError>> Handle(Query query, CancellationToken cancellationToken = default) {
-			var result = await execucoes.Retrieve(query.Id, cancellationToken);
+			var result = await execucoes.RetrieveComOrgaos(query.Id, cancellationToken);
 
 			if (result.IsFailure) {
 				return Failure(result.Error.ToExecucaoCargaError());

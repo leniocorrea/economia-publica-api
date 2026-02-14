@@ -16,7 +16,9 @@ public interface IExecucoesCarga : IRepository<ExecucaoCarga> {
 		CancellationToken cancellationToken = default);
 }
 
-public interface IExecucoesCargaReader : IReadRepository<ExecucaoCarga>;
+public interface IExecucoesCargaReader : IReadRepository<ExecucaoCarga> {
+	Task<Result<ExecucaoCarga, RepositoryError>> RetrieveComOrgaos(Int64 id, CancellationToken cancellationToken = default);
+}
 
 public static class ExecucoesCargaSpecifications {
 	public static Specification<ExecucaoCarga> All() => new All();

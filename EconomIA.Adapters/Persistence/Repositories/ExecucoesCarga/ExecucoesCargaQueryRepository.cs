@@ -2,12 +2,12 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using EconomIA.Common.Domain;
 using EconomIA.Common.EntityFramework.Repositories;
 using EconomIA.Common.Persistence;
 using EconomIA.Domain;
 using EconomIA.Domain.Repositories;
-using LinqKit;
 using Microsoft.EntityFrameworkCore;
 
 namespace EconomIA.Adapters.Persistence.Repositories.ExecucoesCarga;
@@ -19,37 +19,18 @@ public class ExecucoesCargaQueryRepository : QueryRepository<EconomIAQueryDbCont
 		contextFactory = factory;
 	}
 
-	protected override Task<IDataScope<ExecucaoCarga>> CreateScope(CancellationToken cancellationToken = default) {
-		var scope = new ExecucoesCargaQueryScope(contextFactory, cancellationToken);
-		return Task.FromResult<IDataScope<ExecucaoCarga>>(scope);
-	}
-}
+	public async Task<Result<ExecucaoCarga, RepositoryError>> RetrieveComOrgaos(Int64 id, CancellationToken cancellationToken = default) {
+		await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-file class ExecucoesCargaQueryScope(IDbContextFactory<EconomIAQueryDbContext> factory, CancellationToken cancellationToken = default) : IDataScope<ExecucaoCarga> {
-	private EconomIAQueryDbContext? context;
-	private Boolean disposed;
-
-	public async Task<IQueryable<ExecucaoCarga>> Query() {
-		ObjectDisposedException.ThrowIf(disposed, typeof(ExecucoesCargaQueryScope));
-
-		context ??= await factory.CreateDbContextAsync(cancellationToken);
-		return context.Set<ExecucaoCarga>()
+		var execucao = await context.Set<ExecucaoCarga>()
 			.Include(x => x.Orgaos)
 				.ThenInclude(x => x.Orgao)
-			.OrderByDescending(x => x.InicioEm)
-			.AsQueryable()
-			.AsExpandableEFCore();
-	}
+			.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-	public async ValueTask DisposeAsync() {
-		if (disposed) {
-			return;
+		if (execucao is null) {
+			return RepositoryError.NotFound($"ExecucaoCarga with Id {id} not found.");
 		}
 
-		disposed = true;
-
-		if (context is not null) {
-			await context.DisposeAsync();
-		}
+		return execucao;
 	}
 }
