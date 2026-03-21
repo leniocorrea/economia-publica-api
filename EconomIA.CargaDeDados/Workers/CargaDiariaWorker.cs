@@ -26,7 +26,10 @@ public class CargaDiariaWorker : BackgroundService {
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
-		logger.LogInformation("Worker de carga diaria iniciado. Cron: {CronExpression}", configuracao.CronExpression);
+		logger.LogInformation(
+			"Worker de carga diaria iniciado. Cron: {CronExpression}, Modo: {Modo}",
+			configuracao.CronExpression,
+			configuracao.ModoCargaAutomatica);
 
 		while (!stoppingToken.IsCancellationRequested) {
 			var proximaExecucao = cronExpression.GetNextOccurrence(DateTimeOffset.UtcNow, TimeZoneInfo.Local);
@@ -62,9 +65,8 @@ public class CargaDiariaWorker : BackgroundService {
 		var servicos = scope.ServiceProvider;
 
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
-		var orquestrador = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
 
-		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync(configuracao.TimeoutExecucaoHoras);
 
 		if (execucaoAtiva is not null) {
 			logger.LogWarning(
@@ -74,6 +76,63 @@ public class CargaDiariaWorker : BackgroundService {
 				execucaoAtiva.InicioEm);
 			return;
 		}
+
+		if (configuracao.ModoCargaAutomatica == ModoExecucao.Brasil) {
+			await ExecutarCargaBrasilAsync(servicos, execucoesCarga, stoppingToken);
+		} else {
+			await ExecutarCargaIncrementalAsync(servicos, execucoesCarga, stoppingToken);
+		}
+	}
+
+	private async Task ExecutarCargaBrasilAsync(IServiceProvider servicos, ExecucoesCarga execucoesCarga, CancellationToken stoppingToken) {
+		var servicoBrasil = servicos.GetRequiredService<ServicoCargaBrasil>();
+
+		var metricas = new MetricasExecucao();
+		var execucao = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Brasil, TipoGatilho.Scheduler);
+
+		WorkerHealthCheck.RegistrarInicioExecucao(execucao.Identificador);
+
+		try {
+			var dataFinal = DateTime.Now;
+			var dataInicial = dataFinal.AddDays(-configuracao.DiasRetroativos);
+
+			logger.LogInformation(
+				"Iniciando carga Brasil. Execucao ID: {ExecucaoId}, Periodo: {DataInicial:dd/MM/yyyy} a {DataFinal:dd/MM/yyyy}",
+				execucao.Identificador, dataInicial, dataFinal);
+
+			var resultado = await servicoBrasil.ProcessarCargaCompletaAsync(dataInicial, dataFinal, apenasModalidadesComDados: true, stoppingToken);
+
+			metricas.TotalComprasProcessadas = resultado.ComprasProcessadas;
+			metricas.TotalItensIndexados = resultado.ItensIndexados;
+			metricas.TotalContratosProcessados = resultado.ContratosProcessados;
+			metricas.TotalAtasProcessadas = resultado.AtasProcessadas;
+			metricas.TotalOrgaosProcessados = resultado.OrgaosProcessados;
+
+			await execucoesCarga.FinalizarComSucessoAsync(execucao.Identificador, metricas);
+
+			logger.LogInformation(
+				"Carga Brasil finalizada. Execucao ID: {ExecucaoId}, Compras: {TotalCompras}, Contratos: {TotalContratos}, Atas: {TotalAtas}, Itens: {TotalItens}, Duracao: {Duracao}ms",
+				execucao.Identificador,
+				resultado.ComprasProcessadas,
+				resultado.ContratosProcessados,
+				resultado.AtasProcessadas,
+				resultado.ItensIndexados,
+				resultado.DuracaoMs);
+
+			WorkerHealthCheck.RegistrarFimExecucao(StatusExecucao.Sucesso);
+		} catch (OperationCanceledException) {
+			logger.LogWarning("Carga Brasil cancelada. Execucao ID: {ExecucaoId}", execucao.Identificador);
+			await execucoesCarga.FinalizarComCancelamentoAsync(execucao.Identificador, metricas);
+			WorkerHealthCheck.RegistrarFimExecucao(StatusExecucao.Cancelado);
+		} catch (Exception ex) {
+			logger.LogError(ex, "Erro na carga Brasil. Execucao ID: {ExecucaoId}", execucao.Identificador);
+			await execucoesCarga.FinalizarComErroAsync(execucao.Identificador, ex.Message, ex.StackTrace, metricas);
+			WorkerHealthCheck.RegistrarFimExecucao(StatusExecucao.Erro);
+		}
+	}
+
+	private async Task ExecutarCargaIncrementalAsync(IServiceProvider servicos, ExecucoesCarga execucoesCarga, CancellationToken stoppingToken) {
+		var orquestrador = servicos.GetRequiredService<ServicoOrquestradorImportacao>();
 
 		var metricas = new MetricasExecucao();
 		var execucao = await execucoesCarga.IniciarExecucaoAsync(ModoExecucao.Incremental, TipoGatilho.Scheduler);

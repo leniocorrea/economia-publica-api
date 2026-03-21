@@ -100,6 +100,9 @@ services:
   # Worker de Carga de Dados (execucao automatica)
   economia-worker:
     container_name: economia-worker
+    build:
+      context: .
+      dockerfile: EconomIA.CargaDeDados/Dockerfile
     image: ghcr.io/leniocorrea/economia-worker:latest
     ports:
       - "5100:5100"
@@ -110,6 +113,8 @@ services:
       - Worker__CronExpression=${WORKER__CRON_EXPRESSION:-0 2 * * *}
       - Worker__DiasRetroativos=${WORKER__DIAS_RETROATIVOS:-1}
       - Worker__SincronizarOrgaos=${WORKER__SINCRONIZAR_ORGAOS:-true}
+      - Worker__ModoCargaAutomatica=${WORKER__MODO_CARGA_AUTOMATICA:-brasil}
+      - Worker__TimeoutExecucaoHoras=${WORKER__TIMEOUT_EXECUCAO_HORAS:-6}
       - Sentry__Enabled=${SENTRY__ENABLED:-false}
       - Sentry__Dsn=${SENTRY__DSN:-}
       - Api__BaseUrl=http://economia-api:8080

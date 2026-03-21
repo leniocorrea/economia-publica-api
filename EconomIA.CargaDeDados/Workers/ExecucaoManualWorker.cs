@@ -1,21 +1,26 @@
+using EconomIA.CargaDeDados.Configuration;
 using EconomIA.CargaDeDados.HealthChecks;
 using EconomIA.CargaDeDados.Models;
 using EconomIA.CargaDeDados.Observability;
 using EconomIA.CargaDeDados.Repositories;
 using EconomIA.CargaDeDados.Services;
+using Microsoft.Extensions.Options;
 
 namespace EconomIA.CargaDeDados.Workers;
 
 public class ExecucaoManualWorker : BackgroundService {
 	private readonly IServiceScopeFactory scopeFactory;
 	private readonly ILogger<ExecucaoManualWorker> logger;
+	private readonly WorkerConfiguration configuracao;
 	private static readonly TimeSpan IntervaloVerificacao = TimeSpan.FromSeconds(10);
 
 	public ExecucaoManualWorker(
 		IServiceScopeFactory scopeFactory,
-		ILogger<ExecucaoManualWorker> logger) {
+		ILogger<ExecucaoManualWorker> logger,
+		IOptions<WorkerConfiguration> configuracao) {
 		this.scopeFactory = scopeFactory;
 		this.logger = logger;
+		this.configuracao = configuracao.Value;
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
@@ -40,7 +45,7 @@ public class ExecucaoManualWorker : BackgroundService {
 
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
 
-		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync(configuracao.TimeoutExecucaoHoras);
 
 		if (execucaoAtiva is not null) {
 			logger.LogDebug(

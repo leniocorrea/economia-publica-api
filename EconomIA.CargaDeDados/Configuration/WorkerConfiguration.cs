@@ -8,4 +8,6 @@ public sealed class WorkerConfiguration {
 	public Boolean SincronizarOrgaos { get; init; } = true;
 	public String CronSincronizacaoOrgaos { get; init; } = "0 0 * * 0";
 	public Int32 MaxConcorrencia { get; init; } = 4;
+	public String ModoCargaAutomatica { get; init; } = "brasil";
+	public Int32 TimeoutExecucaoHoras { get; init; } = 6;
 }

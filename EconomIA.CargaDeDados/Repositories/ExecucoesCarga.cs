@@ -3,14 +3,17 @@ using System.Reflection;
 using Dapper;
 using EconomIA.CargaDeDados.Models;
 using EconomIA.CargaDeDados.Observability;
+using Microsoft.Extensions.Logging;
 
 namespace EconomIA.CargaDeDados.Repositories;
 
 public class ExecucoesCarga {
 	private readonly IDbConnection conexao;
+	private readonly ILogger<ExecucoesCarga> logger;
 
-	public ExecucoesCarga(IDbConnection conexao) {
+	public ExecucoesCarga(IDbConnection conexao, ILogger<ExecucoesCarga> logger) {
 		this.conexao = conexao;
+		this.logger = logger;
 	}
 
 	public async Task<ExecucaoCarga> IniciarExecucaoAsync(String modoExecucao, String tipoGatilho) {
@@ -371,7 +374,11 @@ public class ExecucoesCarga {
 		return await conexao.ExecuteScalarAsync<Boolean>(sql, new { Status = StatusExecucao.EmAndamento });
 	}
 
-	public async Task<ExecucaoCarga?> ObterExecucaoEmAndamentoAsync() {
+	public async Task<ExecucaoCarga?> ObterExecucaoEmAndamentoAsync(Int32 timeoutHoras = 0) {
+		if (timeoutHoras > 0) {
+			await CancelarExecucoesTravadasAsync(timeoutHoras);
+		}
+
 		var sql = @"
 			SELECT
 				identificador AS Identificador,
@@ -386,5 +393,33 @@ public class ExecucoesCarga {
 		";
 
 		return await conexao.QueryFirstOrDefaultAsync<ExecucaoCarga>(sql, new { Status = StatusExecucao.EmAndamento });
+	}
+
+	private async Task CancelarExecucoesTravadasAsync(Int32 timeoutHoras) {
+		var sql = @"
+			UPDATE public.execucao_carga
+			SET
+				fim_em = NOW(),
+				status = @NovoStatus,
+				mensagem_erro = @MensagemErro
+			WHERE status = @StatusAtual
+			  AND inicio_em < NOW() - @Timeout * INTERVAL '1 hour'
+			RETURNING identificador, modo_execucao, inicio_em;
+		";
+
+		var canceladas = await conexao.QueryAsync<(Int64 Identificador, String ModoExecucao, DateTime InicioEm)>(sql, new {
+			StatusAtual = StatusExecucao.EmAndamento,
+			NovoStatus = StatusExecucao.Cancelado,
+			MensagemErro = $"Cancelado automaticamente por timeout ({timeoutHoras}h)",
+			Timeout = timeoutHoras
+		});
+
+		foreach (var execucao in canceladas) {
+			logger.LogWarning(
+				"Execucao travada cancelada automaticamente. ID: {ExecucaoId}, Modo: {Modo}, Inicio: {Inicio}",
+				execucao.Identificador,
+				execucao.ModoExecucao,
+				execucao.InicioEm);
+		}
 	}
 }
