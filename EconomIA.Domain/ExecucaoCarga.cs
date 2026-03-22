@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using EconomIA.Common.Domain;
 
@@ -59,6 +60,11 @@ public static class ModoExecucaoTipo {
 	public const String Incremental = "incremental";
 	public const String Manual = "manual";
 	public const String Orgaos = "orgaos";
+	public const String Brasil = "brasil";
+
+	public static readonly String[] ModosCargaAutomatica = [Incremental, Brasil];
+
+	public static Boolean EhModoCargaAutomaticaValido(String modo) => ModosCargaAutomatica.Contains(modo);
 }
 
 public static class TipoGatilhoTipo {

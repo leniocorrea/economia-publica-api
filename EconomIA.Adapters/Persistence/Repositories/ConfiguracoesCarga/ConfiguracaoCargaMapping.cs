@@ -59,6 +59,11 @@ public class ConfiguracaoCargaMapping : AggregateMapping<ConfiguracaoCarga> {
 			.HasColumnName("dia_semana_sincronizacao")
 			.HasDefaultValue(0);
 
+		builder.Property(x => x.ModoCargaAutomatica)
+			.HasColumnName("modo_carga_automatica")
+			.HasMaxLength(20)
+			.HasDefaultValue("brasil");
+
 		builder.Property(x => x.AtualizadoEm)
 			.HasColumnName("atualizado_em")
 			.IsRequired();

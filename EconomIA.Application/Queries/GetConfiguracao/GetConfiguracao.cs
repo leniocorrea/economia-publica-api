@@ -24,6 +24,7 @@ public static class GetConfiguracao {
 		Boolean SincronizarOrgaos,
 		String HorarioSincronizacao,
 		Int32 DiaSemanasSincronizacao,
+		String ModoCargaAutomatica,
 		DateTime AtualizadoEm);
 
 	public class Handler(IConfiguracoesCarga configuracoesCarga) : QueryHandler<Query, Response> {
@@ -49,6 +50,7 @@ public static class GetConfiguracao {
 				SincronizarOrgaos: config.SincronizarOrgaos,
 				HorarioSincronizacao: config.HorarioSincronizacao.ToString("HH:mm"),
 				DiaSemanasSincronizacao: config.DiaSemanasSincronizacao,
+				ModoCargaAutomatica: config.ModoCargaAutomatica,
 				AtualizadoEm: config.AtualizadoEm
 			);
 

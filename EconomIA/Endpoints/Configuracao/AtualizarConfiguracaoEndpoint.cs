@@ -31,7 +31,8 @@ public static class AtualizarConfiguracaoEndpoint {
 		Boolean CarregarAtas,
 		Boolean SincronizarOrgaos,
 		String HorarioSincronizacao,
-		Int32 DiaSemanasSincronizacao);
+		Int32 DiaSemanasSincronizacao,
+		String ModoCargaAutomatica);
 
 	private static async Task<IResult> Handle([FromServices] IMediator mediator, [FromBody] Request request) {
 		var command = new AtualizarConfiguracao.Command(
@@ -46,7 +47,8 @@ public static class AtualizarConfiguracaoEndpoint {
 			CarregarAtas: request.CarregarAtas,
 			SincronizarOrgaos: request.SincronizarOrgaos,
 			HorarioSincronizacao: request.HorarioSincronizacao,
-			DiaSemanasSincronizacao: request.DiaSemanasSincronizacao
+			DiaSemanasSincronizacao: request.DiaSemanasSincronizacao,
+			ModoCargaAutomatica: request.ModoCargaAutomatica
 		);
 
 		var result = await mediator.Send(command);

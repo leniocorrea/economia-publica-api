@@ -21,6 +21,7 @@ public class ConfiguracaoCarga : Aggregate {
 		Boolean sincronizarOrgaos,
 		TimeOnly horarioSincronizacao,
 		Int32 diaSemanasSincronizacao,
+		String modoCargaAutomatica,
 		DateTime atualizadoEm,
 		String? atualizadoPor) : base(id) {
 		HorarioExecucao = horarioExecucao;
@@ -35,6 +36,7 @@ public class ConfiguracaoCarga : Aggregate {
 		SincronizarOrgaos = sincronizarOrgaos;
 		HorarioSincronizacao = horarioSincronizacao;
 		DiaSemanasSincronizacao = diaSemanasSincronizacao;
+		ModoCargaAutomatica = modoCargaAutomatica;
 		AtualizadoEm = atualizadoEm;
 		AtualizadoPor = atualizadoPor;
 	}
@@ -54,6 +56,7 @@ public class ConfiguracaoCarga : Aggregate {
 			sincronizarOrgaos: true,
 			horarioSincronizacao: new TimeOnly(0, 0),
 			diaSemanasSincronizacao: 0,
+			modoCargaAutomatica: ModoExecucaoTipo.Brasil,
 			atualizadoEm: DateTime.UtcNow,
 			atualizadoPor: null
 		);
@@ -71,6 +74,7 @@ public class ConfiguracaoCarga : Aggregate {
 	public virtual Boolean SincronizarOrgaos { get; protected set; }
 	public virtual TimeOnly HorarioSincronizacao { get; protected set; }
 	public virtual Int32 DiaSemanasSincronizacao { get; protected set; }
+	public virtual String ModoCargaAutomatica { get; protected set; } = ModoExecucaoTipo.Brasil;
 	public virtual DateTime AtualizadoEm { get; protected set; }
 	public virtual String? AtualizadoPor { get; protected set; }
 
@@ -87,6 +91,7 @@ public class ConfiguracaoCarga : Aggregate {
 		Boolean sincronizarOrgaos,
 		TimeOnly horarioSincronizacao,
 		Int32 diaSemanasSincronizacao,
+		String modoCargaAutomatica,
 		String? atualizadoPor = null) {
 		HorarioExecucao = horarioExecucao;
 		DiasSemana = diasSemana;
@@ -100,6 +105,7 @@ public class ConfiguracaoCarga : Aggregate {
 		SincronizarOrgaos = sincronizarOrgaos;
 		HorarioSincronizacao = horarioSincronizacao;
 		DiaSemanasSincronizacao = diaSemanasSincronizacao;
+		ModoCargaAutomatica = modoCargaAutomatica;
 		AtualizadoEm = DateTime.UtcNow;
 		AtualizadoPor = atualizadoPor;
 	}

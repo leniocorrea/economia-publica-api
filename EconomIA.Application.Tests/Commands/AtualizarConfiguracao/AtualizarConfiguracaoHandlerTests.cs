@@ -180,7 +180,8 @@ public class AtualizarConfiguracaoHandlerTests {
 			CarregarAtas: true,
 			SincronizarOrgaos: true,
 			HorarioSincronizacao: "01:00",
-			DiaSemanasSincronizacao: 0
+			DiaSemanasSincronizacao: 0,
+			ModoCargaAutomatica: "brasil"
 		);
 	}
 
@@ -199,6 +200,7 @@ public class AtualizarConfiguracaoHandlerTests {
 			sincronizarOrgaos: true,
 			horarioSincronizacao: new TimeOnly(0, 0),
 			diaSemanasSincronizacao: 0,
+			modoCargaAutomatica: "brasil",
 			atualizadoEm: DateTime.UtcNow,
 			atualizadoPor: null
 		);

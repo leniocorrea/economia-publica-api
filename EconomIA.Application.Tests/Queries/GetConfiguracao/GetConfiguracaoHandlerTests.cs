@@ -58,6 +58,7 @@ public class GetConfiguracaoHandlerTests {
 			sincronizarOrgaos: true,
 			horarioSincronizacao: new TimeOnly(23, 45),
 			diaSemanasSincronizacao: 0,
+			modoCargaAutomatica: "brasil",
 			atualizadoEm: DateTime.UtcNow,
 			atualizadoPor: null
 		);
@@ -98,6 +99,7 @@ public class GetConfiguracaoHandlerTests {
 			sincronizarOrgaos: true,
 			horarioSincronizacao: new TimeOnly(0, 0),
 			diaSemanasSincronizacao: 0,
+			modoCargaAutomatica: "brasil",
 			atualizadoEm: DateTime.UtcNow,
 			atualizadoPor: null
 		);

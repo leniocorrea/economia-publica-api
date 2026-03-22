@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using EconomIA.Common.Results;
+using EconomIA.Domain;
 using EconomIA.Domain.Repositories;
 using static EconomIA.Domain.Results.EconomIAErrorCodes;
 
@@ -22,7 +23,8 @@ public static class AtualizarConfiguracao {
 		Boolean CarregarAtas,
 		Boolean SincronizarOrgaos,
 		String HorarioSincronizacao,
-		Int32 DiaSemanasSincronizacao) : ICommand;
+		Int32 DiaSemanasSincronizacao,
+		String ModoCargaAutomatica) : ICommand;
 
 	public class Handler(IConfiguracoesCarga configuracoesCarga) : CommandHandler<Command> {
 		public override async Task<UnitResult<HandlerResultError>> Handle(Command command, CancellationToken cancellationToken = default) {
@@ -60,7 +62,8 @@ public static class AtualizarConfiguracao {
 				carregarAtas: command.CarregarAtas,
 				sincronizarOrgaos: command.SincronizarOrgaos,
 				horarioSincronizacao: horarioSincronizacao,
-				diaSemanasSincronizacao: command.DiaSemanasSincronizacao
+				diaSemanasSincronizacao: command.DiaSemanasSincronizacao,
+				modoCargaAutomatica: command.ModoCargaAutomatica
 			);
 
 			var updateResult = await configuracoesCarga.Update(config, cancellationToken);
@@ -111,6 +114,10 @@ public static class AtualizarConfiguracao {
 
 			if (command.MaxConcorrencia < 1 || command.MaxConcorrencia > 20) {
 				return Failure(InvalidConfiguracaoCargaRequest, "Concorrência máxima deve estar entre 1 e 20.");
+			}
+
+			if (!ModoExecucaoTipo.EhModoCargaAutomaticaValido(command.ModoCargaAutomatica)) {
+				return Failure(InvalidConfiguracaoCargaRequest, $"Modo de carga automática inválido. Valores aceitos: {String.Join(", ", ModoExecucaoTipo.ModosCargaAutomatica)}.");
 			}
 
 			return Success();
