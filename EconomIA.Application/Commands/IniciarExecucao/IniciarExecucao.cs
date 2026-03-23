@@ -26,7 +26,7 @@ public static class IniciarExecucao {
 	);
 
 	public class Handler(IExecucoesCarga execucoesCarga) : CommandHandler<Command, Response> {
-		private static readonly String[] ModosValidos = [ModoExecucaoTipo.Incremental, ModoExecucaoTipo.Diaria];
+		private static readonly String[] ModosValidos = [ModoExecucaoTipo.Incremental, ModoExecucaoTipo.Diaria, ModoExecucaoTipo.Brasil];
 
 		public override async Task<Result<Response, HandlerResultError>> Handle(Command command, CancellationToken cancellationToken = default) {
 			var validacao = Validar(command);
@@ -66,9 +66,11 @@ public static class IniciarExecucao {
 				return Failure(InvalidExecucaoRequest, $"Modo de execução inválido. Use: {String.Join(", ", ModosValidos)}");
 			}
 
-			if (command.ModoExecucao.ToLower() == ModoExecucaoTipo.Diaria) {
+			var modo = command.ModoExecucao.ToLower();
+
+			if (modo == ModoExecucaoTipo.Diaria || modo == ModoExecucaoTipo.Brasil) {
 				if (!command.DiasRetroativos.HasValue || command.DiasRetroativos.Value < 1) {
-					return Failure(InvalidExecucaoRequest, "Dias retroativos deve ser informado e maior que zero para execução diária.");
+					return Failure(InvalidExecucaoRequest, "Dias retroativos deve ser informado e maior que zero.");
 				}
 
 				if (command.DiasRetroativos.Value > 365) {

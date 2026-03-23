@@ -8,6 +8,7 @@ public static class ExecucoesEndpoints {
 		app.MapListExecucoes();
 		app.MapGetExecucao();
 		app.MapIniciarExecucao();
+		app.MapCancelarExecucao();
 
 		return app;
 	}

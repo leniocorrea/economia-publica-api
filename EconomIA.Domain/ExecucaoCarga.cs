@@ -39,6 +39,14 @@ public class ExecucaoCarga : Aggregate {
 			CriadoEm = DateTime.UtcNow
 		};
 	}
+
+	public Boolean PodeCancelar() => Status == StatusExecucao.Pendente || Status == StatusExecucao.EmAndamento;
+
+	public void Cancelar() {
+		Status = StatusExecucao.Cancelado;
+		FimEm = DateTime.UtcNow;
+		MensagemErro = "Cancelado pelo usuário";
+	}
 }
 
 public record ParametrosExecucao(

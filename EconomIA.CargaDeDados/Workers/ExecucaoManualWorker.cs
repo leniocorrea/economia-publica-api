@@ -94,6 +94,19 @@ public class ExecucaoManualWorker : BackgroundService {
 			} else if (execucao.ModoExecucao == ModoExecucao.Diaria) {
 				var diasRetroativos = parametros?.DiasRetroativos ?? 1;
 				await orquestrador.ExecutarImportacaoDiariaAsync(metricas, parametros?.Cnpjs, diasRetroativos, stoppingToken);
+			} else if (execucao.ModoExecucao == ModoExecucao.Brasil) {
+				var servicoBrasil = servicos.GetRequiredService<ServicoCargaBrasil>();
+				var diasRetroativos = parametros?.DiasRetroativos ?? 1;
+				var dataFinal = DateTime.Now;
+				var dataInicial = dataFinal.AddDays(-diasRetroativos);
+
+				var resultado = await servicoBrasil.ProcessarCargaCompletaAsync(dataInicial, dataFinal, apenasModalidadesComDados: true, stoppingToken);
+
+				metricas.TotalComprasProcessadas = resultado.ComprasProcessadas;
+				metricas.TotalItensIndexados = resultado.ItensIndexados;
+				metricas.TotalContratosProcessados = resultado.ContratosProcessados;
+				metricas.TotalAtasProcessadas = resultado.AtasProcessadas;
+				metricas.TotalOrgaosProcessados = resultado.OrgaosProcessados;
 			} else {
 				throw new InvalidOperationException($"Modo de execucao nao suportado: {execucao.ModoExecucao}");
 			}
