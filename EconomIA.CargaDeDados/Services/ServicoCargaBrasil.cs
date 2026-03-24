@@ -23,6 +23,8 @@ public class ServicoCargaBrasil {
 	private const Int32 TamanhoPagina = 50;
 	private const Int32 MaxModalidadesEmParalelo = 4;
 	private const Int32 RequestsPorSegundo = 70;
+	private const Int32 MaxTentativasPorPagina = 3;
+	private static readonly TimeSpan[] IntervalosRetry = { TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30) };
 
 	private static readonly Int32[] ModalidadesComDados = { 6, 8, 9, 12 };
 
@@ -145,6 +147,7 @@ public class ServicoCargaBrasil {
 		var comprasModalidade = 0;
 		var itensModalidade = 0;
 		var pagina = 1;
+		var tentativasConsecutivas = 0;
 
 		logger.LogDebug("Iniciando modalidade {Modalidade}", modalidade);
 
@@ -182,6 +185,8 @@ public class ServicoCargaBrasil {
 					break;
 				}
 
+				tentativasConsecutivas = 0;
+
 				var (compras, itens) = await ProcessarLoteDeComprasAsync(resultado.Data, bufferElastic, orgaosProcessados, cancellationToken);
 				comprasModalidade += compras;
 				itensModalidade += itens;
@@ -202,9 +207,23 @@ public class ServicoCargaBrasil {
 					logger.LogDebug("Modalidade {Modalidade}: pagina {Pagina}/{Total}, compras: {Compras}", modalidade, pagina, resultado.TotalPaginas, comprasModalidade);
 				}
 
-			} catch (Exception ex) {
-				logger.LogError(ex, "Erro ao processar modalidade {Modalidade}, pagina {Pagina}", modalidade, pagina);
+			} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
 				break;
+			} catch (Exception ex) {
+				tentativasConsecutivas++;
+
+				if (tentativasConsecutivas <= MaxTentativasPorPagina) {
+					var intervalo = IntervalosRetry[tentativasConsecutivas - 1];
+					logger.LogWarning("Erro ao processar modalidade {Modalidade}, pagina {Pagina}. Tentativa {Tentativa}/{Max}. Retry em {Intervalo}s",
+						modalidade, pagina, tentativasConsecutivas, MaxTentativasPorPagina, intervalo.TotalSeconds);
+					await Task.Delay(intervalo, cancellationToken);
+					continue;
+				}
+
+				logger.LogError(ex, "Erro ao processar modalidade {Modalidade}, pagina {Pagina} apos {Max} tentativas. Pulando pagina",
+					modalidade, pagina, MaxTentativasPorPagina);
+				tentativasConsecutivas = 0;
+				pagina++;
 			}
 		}
 
@@ -320,19 +339,33 @@ public class ServicoCargaBrasil {
 		Int32 sequencialCompra,
 		CancellationToken cancellationToken) {
 
-		using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
+		for (var tentativa = 1; tentativa <= MaxTentativasPorPagina; tentativa++) {
+			using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
 
-		if (!lease.IsAcquired) {
-			await Task.Delay(100, cancellationToken);
+			if (!lease.IsAcquired) {
+				await Task.Delay(100, cancellationToken);
+			}
+
+			try {
+				var url = $"https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras/{anoCompra}/{sequencialCompra}/itens";
+				return await httpClient.GetFromJsonAsync<List<PncpItemDto>>(url, cancellationToken);
+			} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+				return null;
+			} catch (Exception ex) {
+				if (tentativa < MaxTentativasPorPagina) {
+					logger.LogWarning("Erro ao buscar itens da compra {Cnpj}/{Ano}/{Seq}. Tentativa {Tentativa}/{Max}",
+						cnpj, anoCompra, sequencialCompra, tentativa, MaxTentativasPorPagina);
+					await Task.Delay(IntervalosRetry[tentativa - 1], cancellationToken);
+					continue;
+				}
+
+				logger.LogWarning(ex, "Erro ao buscar itens da compra {Cnpj}/{Ano}/{Seq} apos {Max} tentativas",
+					cnpj, anoCompra, sequencialCompra, MaxTentativasPorPagina);
+				return null;
+			}
 		}
 
-		try {
-			var url = $"https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras/{anoCompra}/{sequencialCompra}/itens";
-			return await httpClient.GetFromJsonAsync<List<PncpItemDto>>(url, cancellationToken);
-		} catch (Exception ex) {
-			logger.LogWarning(ex, "Erro ao buscar itens da compra {Cnpj}/{Ano}/{Seq}", cnpj, anoCompra, sequencialCompra);
-			return null;
-		}
+		return null;
 	}
 
 	private async Task BuscarEProcessarResultadosAsync(
@@ -344,34 +377,48 @@ public class ServicoCargaBrasil {
 		Int32 numeroItem,
 		CancellationToken cancellationToken) {
 
-		using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
+		for (var tentativa = 1; tentativa <= MaxTentativasPorPagina; tentativa++) {
+			using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
 
-		if (!lease.IsAcquired) {
-			await Task.Delay(100, cancellationToken);
-		}
-
-		try {
-			var url = $"https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras/{anoCompra}/{sequencialCompra}/itens/{numeroItem}/resultados";
-			var resultados = await httpClient.GetFromJsonAsync<List<PncpResultadoDto>>(url, cancellationToken);
-
-			if (resultados is not null) {
-				foreach (var resultadoDto in resultados) {
-					var modeloResultado = new ResultadoItem {
-						IdentificadorDoItemDaCompra = idItem,
-						NiFornecedor = resultadoDto.NiFornecedor,
-						NomeRazaoSocialFornecedor = resultadoDto.NomeRazaoSocialFornecedor,
-						ValorTotalHomologado = resultadoDto.ValorTotalHomologado,
-						ValorUnitarioHomologado = resultadoDto.ValorUnitarioHomologado,
-						QuantidadeHomologada = resultadoDto.QuantidadeHomologada,
-						SituacaoCompraItemResultadoNome = resultadoDto.SituacaoCompraItemResultadoNome,
-						DataResultado = resultadoDto.DataResultado
-					};
-
-					await resultadosItensRepo.UpsertAsync(modeloResultado);
-				}
+			if (!lease.IsAcquired) {
+				await Task.Delay(100, cancellationToken);
 			}
-		} catch (Exception ex) {
-			logger.LogWarning(ex, "Erro ao buscar resultados do item {IdItem}", idItem);
+
+			try {
+				var url = $"https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras/{anoCompra}/{sequencialCompra}/itens/{numeroItem}/resultados";
+				var resultados = await httpClient.GetFromJsonAsync<List<PncpResultadoDto>>(url, cancellationToken);
+
+				if (resultados is not null) {
+					foreach (var resultadoDto in resultados) {
+						var modeloResultado = new ResultadoItem {
+							IdentificadorDoItemDaCompra = idItem,
+							NiFornecedor = resultadoDto.NiFornecedor,
+							NomeRazaoSocialFornecedor = resultadoDto.NomeRazaoSocialFornecedor,
+							ValorTotalHomologado = resultadoDto.ValorTotalHomologado,
+							ValorUnitarioHomologado = resultadoDto.ValorUnitarioHomologado,
+							QuantidadeHomologada = resultadoDto.QuantidadeHomologada,
+							SituacaoCompraItemResultadoNome = resultadoDto.SituacaoCompraItemResultadoNome,
+							DataResultado = resultadoDto.DataResultado
+						};
+
+						await resultadosItensRepo.UpsertAsync(modeloResultado);
+					}
+				}
+
+				return;
+			} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+				return;
+			} catch (Exception ex) {
+				if (tentativa < MaxTentativasPorPagina) {
+					logger.LogWarning("Erro ao buscar resultados do item {IdItem}. Tentativa {Tentativa}/{Max}",
+						idItem, tentativa, MaxTentativasPorPagina);
+					await Task.Delay(IntervalosRetry[tentativa - 1], cancellationToken);
+					continue;
+				}
+
+				logger.LogWarning(ex, "Erro ao buscar resultados do item {IdItem} apos {Max} tentativas",
+					idItem, MaxTentativasPorPagina);
+			}
 		}
 	}
 
@@ -404,6 +451,7 @@ public class ServicoCargaBrasil {
 
 		var totalContratos = 0;
 		var pagina = 1;
+		var tentativasConsecutivas = 0;
 
 		while (!cancellationToken.IsCancellationRequested) {
 			using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
@@ -438,6 +486,8 @@ public class ServicoCargaBrasil {
 					break;
 				}
 
+				tentativasConsecutivas = 0;
+
 				var contratosProcessados = await ProcessarLoteDeContratosAsync(resultado.Data, orgaosProcessados, cancellationToken);
 				totalContratos += contratosProcessados;
 
@@ -451,9 +501,23 @@ public class ServicoCargaBrasil {
 					logger.LogDebug("Contratos: pagina {Pagina}, total: {Total}", pagina, totalContratos);
 				}
 
-			} catch (Exception ex) {
-				logger.LogError(ex, "Erro ao processar contratos, pagina {Pagina}", pagina);
+			} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
 				break;
+			} catch (Exception ex) {
+				tentativasConsecutivas++;
+
+				if (tentativasConsecutivas <= MaxTentativasPorPagina) {
+					var intervalo = IntervalosRetry[tentativasConsecutivas - 1];
+					logger.LogWarning("Erro ao processar contratos, pagina {Pagina}. Tentativa {Tentativa}/{Max}. Retry em {Intervalo}s",
+						pagina, tentativasConsecutivas, MaxTentativasPorPagina, intervalo.TotalSeconds);
+					await Task.Delay(intervalo, cancellationToken);
+					continue;
+				}
+
+				logger.LogError(ex, "Erro ao processar contratos, pagina {Pagina} apos {Max} tentativas. Pulando pagina",
+					pagina, MaxTentativasPorPagina);
+				tentativasConsecutivas = 0;
+				pagina++;
 			}
 		}
 
@@ -557,29 +621,42 @@ public class ServicoCargaBrasil {
 					await Task.Delay(100, cancellationToken);
 				}
 
-				try {
-					var url = $"https://pncp.gov.br/api/consulta/v1/atas?dataInicial={dataInicial}&dataFinal={dataFinal}&pagina={pagina}";
-					var response = await httpClient.GetAsync(url, cancellationToken);
+				for (var tentativa = 1; tentativa <= MaxTentativasPorPagina; tentativa++) {
+					try {
+						var url = $"https://pncp.gov.br/api/consulta/v1/atas?dataInicial={dataInicial}&dataFinal={dataFinal}&pagina={pagina}";
+						var response = await httpClient.GetAsync(url, cancellationToken);
 
-					if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
-						return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: true);
-					}
+						if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
+							return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: true);
+						}
 
-					if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests) {
-						await Task.Delay(2000, cancellationToken);
-						response = await httpClient.GetAsync(url, cancellationToken);
-					}
+						if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests) {
+							await Task.Delay(2000, cancellationToken);
+							response = await httpClient.GetAsync(url, cancellationToken);
+						}
 
-					if (!response.IsSuccessStatusCode) {
+						if (!response.IsSuccessStatusCode) {
+							return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: false);
+						}
+
+						var resultado = await response.Content.ReadFromJsonAsync<PncpAtasResponse>(cancellationToken: cancellationToken);
+						return (Pagina: pagina, Resultado: resultado, Sucesso: true);
+					} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+						return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: false);
+					} catch (Exception ex) {
+						if (tentativa < MaxTentativasPorPagina) {
+							logger.LogWarning("Erro ao buscar atas pagina {Pagina}. Tentativa {Tentativa}/{Max}",
+								pagina, tentativa, MaxTentativasPorPagina);
+							await Task.Delay(IntervalosRetry[tentativa - 1], cancellationToken);
+							continue;
+						}
+
+						logger.LogWarning(ex, "Erro ao buscar atas pagina {Pagina} apos {Max} tentativas", pagina, MaxTentativasPorPagina);
 						return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: false);
 					}
-
-					var resultado = await response.Content.ReadFromJsonAsync<PncpAtasResponse>(cancellationToken: cancellationToken);
-					return (Pagina: pagina, Resultado: resultado, Sucesso: true);
-				} catch (Exception ex) {
-					logger.LogWarning(ex, "Erro ao buscar atas pagina {Pagina}", pagina);
-					return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: false);
 				}
+
+				return (Pagina: pagina, Resultado: (PncpAtasResponse?)null, Sucesso: false);
 			});
 
 			var resultados = await Task.WhenAll(tarefas);
