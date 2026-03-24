@@ -24,6 +24,7 @@ public class ServicoCargaBrasil {
 	private const Int32 MaxModalidadesEmParalelo = 4;
 	private const Int32 RequestsPorSegundo = 70;
 	private const Int32 MaxTentativasPorPagina = 3;
+	private const Int32 DiasPorFatia = 30;
 	private static readonly TimeSpan[] IntervalosRetry = { TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30) };
 
 	private static readonly Int32[] ModalidadesComDados = { 6, 8, 9, 12 };
@@ -59,8 +60,6 @@ public class ServicoCargaBrasil {
 		CancellationToken cancellationToken = default) {
 
 		var cronometro = Stopwatch.StartNew();
-		var dataInicialStr = dataInicial.ToString("yyyyMMdd");
-		var dataFinalStr = dataFinal.ToString("yyyyMMdd");
 
 		logger.LogInformation(
 			"Iniciando carga de todo o Brasil. Periodo: {DataInicial:dd/MM/yyyy} a {DataFinal:dd/MM/yyyy}, Rate limit: {RateLimit} req/s",
@@ -76,15 +75,34 @@ public class ServicoCargaBrasil {
 			? ModalidadesComDados
 			: Enumerable.Range(1, 14).ToArray();
 
-		var resultadoCompras = await ProcessarComprasBrasilAsync(dataInicialStr, dataFinalStr, modalidades, orgaosProcessados, cancellationToken);
-		totalCompras = resultadoCompras.ComprasProcessadas;
-		totalItens = resultadoCompras.ItensIndexados;
+		var fatias = GerarFatiasDePeriodo(dataInicial, dataFinal);
 
-		var resultadoContratos = await ProcessarContratosBrasilAsync(dataInicialStr, dataFinalStr, orgaosProcessados, cancellationToken);
-		totalContratos = resultadoContratos;
+		logger.LogInformation("Periodo dividido em {QtdFatias} fatias de ate {Dias} dias", fatias.Count, DiasPorFatia);
 
-		var resultadoAtas = await ProcessarAtasBrasilAsync(dataInicialStr, dataFinalStr, orgaosProcessados, cancellationToken);
-		totalAtas = resultadoAtas;
+		foreach (var (inicioFatia, fimFatia) in fatias) {
+			if (cancellationToken.IsCancellationRequested) {
+				break;
+			}
+
+			var inicioStr = inicioFatia.ToString("yyyyMMdd");
+			var fimStr = fimFatia.ToString("yyyyMMdd");
+
+			logger.LogInformation("Processando fatia {Inicio:dd/MM/yyyy} a {Fim:dd/MM/yyyy}", inicioFatia, fimFatia);
+
+			var resultadoCompras = await ProcessarComprasBrasilAsync(inicioStr, fimStr, modalidades, orgaosProcessados, cancellationToken);
+			totalCompras += resultadoCompras.ComprasProcessadas;
+			totalItens += resultadoCompras.ItensIndexados;
+
+			var resultadoContratos = await ProcessarContratosBrasilAsync(inicioStr, fimStr, orgaosProcessados, cancellationToken);
+			totalContratos += resultadoContratos;
+
+			var resultadoAtas = await ProcessarAtasBrasilAsync(inicioStr, fimStr, orgaosProcessados, cancellationToken);
+			totalAtas += resultadoAtas;
+
+			logger.LogInformation(
+				"Fatia {Inicio:dd/MM/yyyy} a {Fim:dd/MM/yyyy} concluida. Parcial - Compras: {Compras}, Itens: {Itens}, Contratos: {Contratos}, Atas: {Atas}",
+				inicioFatia, fimFatia, totalCompras, totalItens, totalContratos, totalAtas);
+		}
 
 		await AtualizarControlesImportacaoAsync(orgaosProcessados.Keys, dataInicial, dataFinal, cancellationToken);
 
@@ -101,6 +119,24 @@ public class ServicoCargaBrasil {
 			totalAtas,
 			orgaosProcessados.Count,
 			cronometro.ElapsedMilliseconds);
+	}
+
+	private static List<(DateTime Inicio, DateTime Fim)> GerarFatiasDePeriodo(DateTime dataInicial, DateTime dataFinal) {
+		var fatias = new List<(DateTime, DateTime)>();
+		var atual = dataInicial;
+
+		while (atual < dataFinal) {
+			var fimFatia = atual.AddDays(DiasPorFatia);
+
+			if (fimFatia > dataFinal) {
+				fimFatia = dataFinal;
+			}
+
+			fatias.Add((atual, fimFatia));
+			atual = fimFatia.AddDays(1);
+		}
+
+		return fatias;
 	}
 
 	private async Task<(Int32 ComprasProcessadas, Int32 ItensIndexados)> ProcessarComprasBrasilAsync(
