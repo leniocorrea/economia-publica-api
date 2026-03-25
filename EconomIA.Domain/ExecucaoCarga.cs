@@ -51,7 +51,10 @@ public class ExecucaoCarga : Aggregate {
 
 public record ParametrosExecucao(
 	Int32? DiasRetroativos,
-	String[]? Cnpjs
+	String[]? Cnpjs,
+	Boolean CarregarCompras = true,
+	Boolean CarregarContratos = true,
+	Boolean CarregarAtas = true
 );
 
 public static class StatusExecucao {

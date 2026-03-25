@@ -14,7 +14,10 @@ public static class IniciarExecucao {
 	public record Command(
 		String ModoExecucao,
 		Int32? DiasRetroativos,
-		String[]? Cnpjs
+		String[]? Cnpjs,
+		Boolean CarregarCompras = true,
+		Boolean CarregarContratos = true,
+		Boolean CarregarAtas = true
 	) : ICommand<Response>;
 
 	public record Response(
@@ -35,7 +38,12 @@ public static class IniciarExecucao {
 				return validacao.ConvertFailure<Response>();
 			}
 
-			var parametros = new ParametrosExecucao(command.DiasRetroativos, command.Cnpjs);
+			var parametros = new ParametrosExecucao(
+				command.DiasRetroativos,
+				command.Cnpjs,
+				command.CarregarCompras,
+				command.CarregarContratos,
+				command.CarregarAtas);
 
 			var result = await execucoesCarga.CriarPendenteAsync(
 				command.ModoExecucao,

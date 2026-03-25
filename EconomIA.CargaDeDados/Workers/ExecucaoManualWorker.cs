@@ -100,7 +100,13 @@ public class ExecucaoManualWorker : BackgroundService {
 				var dataFinal = DateTime.Now;
 				var dataInicial = dataFinal.AddDays(-diasRetroativos);
 
-				var resultado = await servicoBrasil.ProcessarCargaCompletaAsync(dataInicial, dataFinal, apenasModalidadesComDados: true, stoppingToken);
+				var resultado = await servicoBrasil.ProcessarCargaCompletaAsync(
+					dataInicial, dataFinal,
+					apenasModalidadesComDados: true,
+					carregarCompras: parametros?.CarregarCompras ?? true,
+					carregarContratos: parametros?.CarregarContratos ?? true,
+					carregarAtas: parametros?.CarregarAtas ?? true,
+					cancellationToken: stoppingToken);
 
 				metricas.TotalComprasProcessadas = resultado.ComprasProcessadas;
 				metricas.TotalItensIndexados = resultado.ItensIndexados;

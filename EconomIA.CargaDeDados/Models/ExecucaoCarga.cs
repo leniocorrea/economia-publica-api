@@ -68,7 +68,10 @@ public class ExecucaoCarga {
 
 public record ParametrosExecucao(
 	Int32? DiasRetroativos,
-	String[]? Cnpjs
+	String[]? Cnpjs,
+	Boolean CarregarCompras = true,
+	Boolean CarregarContratos = true,
+	Boolean CarregarAtas = true
 ) {
 	public String ToJson() => System.Text.Json.JsonSerializer.Serialize(this);
 }

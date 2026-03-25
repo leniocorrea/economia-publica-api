@@ -25,7 +25,10 @@ public static class IniciarExecucaoEndpoint {
 		var command = new IniciarExecucao.Command(
 			request.ModoExecucao,
 			request.DiasRetroativos,
-			request.Cnpjs);
+			request.Cnpjs,
+			request.CarregarCompras ?? true,
+			request.CarregarContratos ?? true,
+			request.CarregarAtas ?? true);
 
 		var result = await mediator.Send(command);
 
@@ -35,7 +38,10 @@ public static class IniciarExecucaoEndpoint {
 	private record Request(
 		String ModoExecucao,
 		Int32? DiasRetroativos,
-		String[]? Cnpjs);
+		String[]? Cnpjs,
+		Boolean? CarregarCompras,
+		Boolean? CarregarContratos,
+		Boolean? CarregarAtas);
 
 	private record Response(
 		Int64 Id,

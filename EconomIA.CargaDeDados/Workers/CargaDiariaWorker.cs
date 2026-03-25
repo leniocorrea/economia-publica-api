@@ -100,7 +100,7 @@ public class CargaDiariaWorker : BackgroundService {
 				"Iniciando carga Brasil. Execucao ID: {ExecucaoId}, Periodo: {DataInicial:dd/MM/yyyy} a {DataFinal:dd/MM/yyyy}",
 				execucao.Identificador, dataInicial, dataFinal);
 
-			var resultado = await servicoBrasil.ProcessarCargaCompletaAsync(dataInicial, dataFinal, apenasModalidadesComDados: true, stoppingToken);
+			var resultado = await servicoBrasil.ProcessarCargaCompletaAsync(dataInicial, dataFinal, apenasModalidadesComDados: true, cancellationToken: stoppingToken);
 
 			metricas.TotalComprasProcessadas = resultado.ComprasProcessadas;
 			metricas.TotalItensIndexados = resultado.ItensIndexados;

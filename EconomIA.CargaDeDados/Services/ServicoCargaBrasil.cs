@@ -57,6 +57,9 @@ public class ServicoCargaBrasil {
 		DateTime dataInicial,
 		DateTime dataFinal,
 		Boolean apenasModalidadesComDados = true,
+		Boolean carregarCompras = true,
+		Boolean carregarContratos = true,
+		Boolean carregarAtas = true,
 		CancellationToken cancellationToken = default) {
 
 		var cronometro = Stopwatch.StartNew();
@@ -77,7 +80,8 @@ public class ServicoCargaBrasil {
 
 		var fatias = GerarFatiasDePeriodo(dataInicial, dataFinal);
 
-		logger.LogInformation("Periodo dividido em {QtdFatias} fatias de ate {Dias} dias", fatias.Count, DiasPorFatia);
+		logger.LogInformation("Periodo dividido em {QtdFatias} fatias de ate {Dias} dias. Compras: {Compras}, Contratos: {Contratos}, Atas: {Atas}",
+			fatias.Count, DiasPorFatia, carregarCompras, carregarContratos, carregarAtas);
 
 		foreach (var (inicioFatia, fimFatia) in fatias) {
 			if (cancellationToken.IsCancellationRequested) {
@@ -89,15 +93,21 @@ public class ServicoCargaBrasil {
 
 			logger.LogInformation("Processando fatia {Inicio:dd/MM/yyyy} a {Fim:dd/MM/yyyy}", inicioFatia, fimFatia);
 
-			var resultadoCompras = await ProcessarComprasBrasilAsync(inicioStr, fimStr, modalidades, orgaosProcessados, cancellationToken);
-			totalCompras += resultadoCompras.ComprasProcessadas;
-			totalItens += resultadoCompras.ItensIndexados;
+			if (carregarCompras) {
+				var resultadoCompras = await ProcessarComprasBrasilAsync(inicioStr, fimStr, modalidades, orgaosProcessados, cancellationToken);
+				totalCompras += resultadoCompras.ComprasProcessadas;
+				totalItens += resultadoCompras.ItensIndexados;
+			}
 
-			var resultadoContratos = await ProcessarContratosBrasilAsync(inicioStr, fimStr, orgaosProcessados, cancellationToken);
-			totalContratos += resultadoContratos;
+			if (carregarContratos) {
+				var resultadoContratos = await ProcessarContratosBrasilAsync(inicioStr, fimStr, orgaosProcessados, cancellationToken);
+				totalContratos += resultadoContratos;
+			}
 
-			var resultadoAtas = await ProcessarAtasBrasilAsync(inicioStr, fimStr, orgaosProcessados, cancellationToken);
-			totalAtas += resultadoAtas;
+			if (carregarAtas) {
+				var resultadoAtas = await ProcessarAtasBrasilAsync(inicioStr, fimStr, orgaosProcessados, cancellationToken);
+				totalAtas += resultadoAtas;
+			}
 
 			logger.LogInformation(
 				"Fatia {Inicio:dd/MM/yyyy} a {Fim:dd/MM/yyyy} concluida. Parcial - Compras: {Compras}, Itens: {Itens}, Contratos: {Contratos}, Atas: {Atas}",
