@@ -22,6 +22,7 @@ public class ServicoCargaBrasil {
 	private const Int32 TamanhoBufferElastic = 1000;
 	private const Int32 TamanhoPagina = 50;
 	private const Int32 MaxModalidadesEmParalelo = 4;
+	private const Int32 MaxComprasEmParalelo = 10;
 	private const Int32 RequestsPorSegundo = 70;
 	private const Int32 MaxTentativasPorPagina = 3;
 	private const Int32 DiasPorFatia = 30;
@@ -283,17 +284,22 @@ public class ServicoCargaBrasil {
 		ConcurrentDictionary<Int64, Byte> orgaosProcessados,
 		CancellationToken cancellationToken) {
 
-		using var scope = scopeFactory.CreateScope();
-		var orgaosRepo = scope.ServiceProvider.GetRequiredService<Orgaos>();
-		var comprasRepo = scope.ServiceProvider.GetRequiredService<Compras>();
-		var itensDaCompraRepo = scope.ServiceProvider.GetRequiredService<ItensDaCompra>();
-		var resultadosItensRepo = scope.ServiceProvider.GetRequiredService<ResultadosItens>();
-
 		var comprasProcessadas = 0;
 		var itensProcessados = 0;
 
-		foreach (var compraDto in compras) {
+		var opcoes = new ParallelOptions {
+			MaxDegreeOfParallelism = MaxComprasEmParalelo,
+			CancellationToken = cancellationToken
+		};
+
+		await Parallel.ForEachAsync(compras, opcoes, async (compraDto, token) => {
 			try {
+				using var scope = scopeFactory.CreateScope();
+				var orgaosRepo = scope.ServiceProvider.GetRequiredService<Orgaos>();
+				var comprasRepo = scope.ServiceProvider.GetRequiredService<Compras>();
+				var itensDaCompraRepo = scope.ServiceProvider.GetRequiredService<ItensDaCompra>();
+				var resultadosItensRepo = scope.ServiceProvider.GetRequiredService<ResultadosItens>();
+
 				var modeloOrgao = new Orgao {
 					Cnpj = compraDto.OrgaoEntidade.Cnpj,
 					RazaoSocial = compraDto.OrgaoEntidade.RazaoSocial ?? ""
@@ -323,9 +329,9 @@ public class ServicoCargaBrasil {
 				};
 
 				var idCompra = await comprasRepo.UpsertAsync(modeloCompra);
-				comprasProcessadas++;
+				Interlocked.Increment(ref comprasProcessadas);
 
-				var itens = await BuscarItensComRateLimitAsync(compraDto.OrgaoEntidade.Cnpj, compraDto.AnoCompra, compraDto.SequencialCompra, cancellationToken);
+				var itens = await BuscarItensComRateLimitAsync(compraDto.OrgaoEntidade.Cnpj, compraDto.AnoCompra, compraDto.SequencialCompra, token);
 
 				if (itens is not null && itens.Count > 0) {
 					foreach (var itemDto in itens) {
@@ -354,7 +360,7 @@ public class ServicoCargaBrasil {
 							UfSigla = compraDto.UnidadeOrgao?.UfSigla
 						});
 
-						itensProcessados++;
+						Interlocked.Increment(ref itensProcessados);
 
 						if (itemDto.TemResultado) {
 							await BuscarEProcessarResultadosAsync(
@@ -364,7 +370,7 @@ public class ServicoCargaBrasil {
 								compraDto.AnoCompra,
 								compraDto.SequencialCompra,
 								itemDto.NumeroItem,
-								cancellationToken);
+								token);
 						}
 					}
 
@@ -374,7 +380,7 @@ public class ServicoCargaBrasil {
 			} catch (Exception ex) {
 				logger.LogWarning(ex, "Erro ao processar compra {NumeroControle}", compraDto.NumeroControlePncp);
 			}
-		}
+		});
 
 		return (comprasProcessadas, itensProcessados);
 	}
