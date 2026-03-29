@@ -9,5 +9,6 @@ public sealed class WorkerConfiguration {
 	public String CronSincronizacaoOrgaos { get; init; } = "0 0 * * 0";
 	public Int32 MaxConcorrencia { get; init; } = 4;
 	public String ModoCargaAutomatica { get; init; } = "brasil";
+	public Boolean CargaDiariaHabilitada { get; init; } = true;
 	public Int32 TimeoutExecucaoHoras { get; init; } = 6;
 }

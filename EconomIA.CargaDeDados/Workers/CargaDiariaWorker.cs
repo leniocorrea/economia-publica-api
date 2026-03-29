@@ -26,6 +26,11 @@ public class CargaDiariaWorker : BackgroundService {
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
+		if (!configuracao.CargaDiariaHabilitada) {
+			logger.LogInformation("Worker de carga diaria desabilitado por configuracao");
+			return;
+		}
+
 		logger.LogInformation(
 			"Worker de carga diaria iniciado. Cron: {CronExpression}, Modo: {Modo}",
 			configuracao.CronExpression,
@@ -66,7 +71,7 @@ public class CargaDiariaWorker : BackgroundService {
 
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
 
-		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync(configuracao.TimeoutExecucaoHoras);
+		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
 
 		if (execucaoAtiva is not null) {
 			logger.LogWarning(
