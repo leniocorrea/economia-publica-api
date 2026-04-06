@@ -117,7 +117,7 @@ services:
       - Worker__DiasRetroativos=${WORKER__DIAS_RETROATIVOS:-1}
       - Worker__SincronizarOrgaos=${WORKER__SINCRONIZAR_ORGAOS:-true}
       - Worker__ModoCargaAutomatica=${WORKER__MODO_CARGA_AUTOMATICA:-brasil}
-      - Worker__CargaDiariaHabilitada=${WORKER__CARGA_DIARIA_HABILITADA:-false}
+      - Worker__CargaDiariaHabilitada=${WORKER__CARGA_DIARIA_HABILITADA:-true}
       - Worker__TimeoutExecucaoHoras=${WORKER__TIMEOUT_EXECUCAO_HORAS:-6}
       - Sentry__Enabled=${SENTRY__ENABLED:-false}
       - Sentry__Dsn=${SENTRY__DSN:-}
