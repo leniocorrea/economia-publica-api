@@ -50,7 +50,8 @@ builder.Services.AddCors(options => {
 				"http://localhost:3000",
 				"http://127.0.0.1:5173",
 				"http://136.113.233.79",
-				"https://136.113.233.79"
+				"https://136.113.233.79",
+				"https://desenvolvimentoeconomiapublica.prefeiturasistemas.com.br"
 			)
 			.AllowAnyMethod()
 			.AllowAnyHeader()
