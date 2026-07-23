@@ -87,6 +87,14 @@ public static class SearchItensDaCompraEndpoint {
 							compra.ModalidadeNome,
 							compra.SituacaoCompraNome,
 							unidade?.UfSigla,
+							primeiroItem.Atas.Select(a => new AtaDaCompra(
+								a.NumeroControlePncpAta,
+								a.NumeroAtaRegistroPreco,
+								a.AnoAta,
+								a.ObjetoContratacao,
+								a.Cancelado,
+								a.VigenciaInicio,
+								a.VigenciaFim)).ToArray(),
 							g.Select(item => new ItemDaCompra(
 								item.NumeroItem,
 								item.Descricao,
@@ -108,7 +116,14 @@ public static class SearchItensDaCompraEndpoint {
 									r.ValorTotalHomologado,
 									null,
 									compra.NumeroControlePncp
-								)).ToArray()
+								)).ToArray(),
+								new Adesao(
+									item.Adesao.Situacao,
+									item.Adesao.Disponivel,
+									item.Adesao.VigenciaFim,
+									item.Adesao.DiasRestantes,
+									item.Adesao.NumeroControlePncpAta,
+									item.Adesao.SaldoDisponivel)
 							)).ToArray()
 						)
 					);
@@ -147,7 +162,17 @@ public static class SearchItensDaCompraEndpoint {
 		String? ModalidadeNome,
 		String? SituacaoCompraNome,
 		String? UfSigla,
+		AtaDaCompra[] Atas,
 		ItemDaCompra[] ItemDaCompra);
+
+	private record AtaDaCompra(
+		String NumeroControlePncpAta,
+		String? NumeroAtaRegistroPreco,
+		Int32 AnoAta,
+		String? ObjetoContratacao,
+		Boolean Cancelada,
+		DateTime? VigenciaInicio,
+		DateTime? VigenciaFim);
 
 	private record ItemDaCompra(
 		Int32 NumeroItem,
@@ -159,7 +184,16 @@ public static class SearchItensDaCompraEndpoint {
 		String? UnidadeMedida,
 		String? CriterioJulgamentoNome,
 		String? SituacaoCompraItemNome,
-		ResultadoItem[] Resultado);
+		ResultadoItem[] Resultado,
+		Adesao Adesao);
+
+	private record Adesao(
+		String Situacao,
+		Boolean Disponivel,
+		DateTime? VigenciaFim,
+		Int32? DiasRestantes,
+		String? NumeroControlePncpAta,
+		Decimal? SaldoDisponivel);
 
 	private record ResultadoItem(
 		Int32 NumeroItem,

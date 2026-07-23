@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using EconomIA.Application.Adesao;
 using EconomIA.Application.Extensions;
 using EconomIA.Common.Persistence.Pagination;
 using EconomIA.Common.Results;
@@ -47,7 +48,8 @@ public static class SearchItensDaCompra {
 			OrgaoItem? Orgao,
 			ResultadoItem[] Resultados,
 			AtaItem[] Atas,
-			ContratoItem[] Contratos);
+			ContratoItem[] Contratos,
+			SituacaoDaAdesao Adesao);
 
 		public record CompraItem(
 			Int64 Id,
@@ -221,6 +223,8 @@ public static class SearchItensDaCompra {
 				}
 			}
 
+			var hoje = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+
 			var items = itensParaProcessar
 				.Select(x => {
 					var compraItem = x.Compra is not null
@@ -299,6 +303,13 @@ public static class SearchItensDaCompra {
 							.ToArray()
 						: Array.Empty<Response.ContratoItem>();
 
+					var adesao = AvaliadorDeAdesao.Avaliar(
+						atasDoItem
+							.Select(a => new AtaParaAvaliacao(a.NumeroControlePncpAta, a.Cancelado, a.VigenciaFim))
+							.ToArray(),
+						x.TemResultado,
+						hoje);
+
 					var resultadosDoItem = x.Resultados.Count > 0
 						? x.Resultados
 							.Select(r => new Response.ResultadoItem(
@@ -332,7 +343,8 @@ public static class SearchItensDaCompra {
 						orgaoItem,
 						resultadosDoItem,
 						atasDoItem,
-						contratosDoItem);
+						contratosDoItem,
+						adesao);
 				})
 				.ToArray();
 
