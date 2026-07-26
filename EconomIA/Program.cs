@@ -143,6 +143,8 @@ using (var scope = app.Services.CreateScope()) {
 
 		if (pendingMigrations.Count > 0) {
 			logger.LogInformation("Aplicando {Count} migration(s): {Migrations}", pendingMigrations.Count, String.Join(", ", pendingMigrations));
+			var timeoutDeMigracaoEmSegundos = 600;
+			dbContext.Database.SetCommandTimeout(timeoutDeMigracaoEmSegundos);
 			dbContext.Database.Migrate();
 			logger.LogInformation("Migrations aplicadas com sucesso");
 		} else {
