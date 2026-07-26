@@ -45,7 +45,7 @@ public class ExecucaoManualWorker : BackgroundService {
 
 		var execucoesCarga = servicos.GetRequiredService<ExecucoesCarga>();
 
-		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync();
+		var execucaoAtiva = await execucoesCarga.ObterExecucaoEmAndamentoAsync(configuracao.TimeoutExecucaoHoras);
 
 		if (execucaoAtiva is not null) {
 			logger.LogDebug(
