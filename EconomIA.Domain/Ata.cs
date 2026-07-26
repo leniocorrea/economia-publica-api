@@ -27,7 +27,8 @@ public class Ata : Aggregate {
 		DateTime? dataInclusao = null,
 		DateTime? dataAtualizacao = null,
 		DateTime? dataAtualizacaoGlobal = null,
-		String? usuario = null) : base(id) {
+		String? usuario = null,
+		Boolean? possibilidadeAdesao = null) : base(id) {
 		IdentificadorDoOrgao = identificadorDoOrgao;
 		NumeroControlePncpAta = numeroControlePncpAta;
 		AnoAta = anoAta;
@@ -46,6 +47,7 @@ public class Ata : Aggregate {
 		DataAtualizacao = dataAtualizacao;
 		DataAtualizacaoGlobal = dataAtualizacaoGlobal;
 		Usuario = usuario;
+		PossibilidadeAdesao = possibilidadeAdesao;
 	}
 
 	public virtual Int64 IdentificadorDoOrgao { get; protected set; }
@@ -64,6 +66,7 @@ public class Ata : Aggregate {
 	public virtual DateTime? DataAtualizacao { get; protected set; }
 	public virtual DateTime? DataAtualizacaoGlobal { get; protected set; }
 	public virtual String? Usuario { get; protected set; }
+	public virtual Boolean? PossibilidadeAdesao { get; protected set; }
 	public virtual DateTime? CriadoEm { get; protected set; }
 	public virtual DateTime? AtualizadoEm { get; protected set; }
 

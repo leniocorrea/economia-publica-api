@@ -94,7 +94,8 @@ public static class SearchItensDaCompraEndpoint {
 								a.ObjetoContratacao,
 								a.Cancelado,
 								a.VigenciaInicio,
-								a.VigenciaFim)).ToArray(),
+								a.VigenciaFim,
+								a.PossibilidadeAdesao)).ToArray(),
 							g.Select(item => new ItemDaCompra(
 								item.NumeroItem,
 								item.Descricao,
@@ -172,7 +173,8 @@ public static class SearchItensDaCompraEndpoint {
 		String? ObjetoContratacao,
 		Boolean Cancelada,
 		DateTime? VigenciaInicio,
-		DateTime? VigenciaFim);
+		DateTime? VigenciaFim,
+		Boolean? PossibilidadeAdesao);
 
 	private record ItemDaCompra(
 		Int32 NumeroItem,

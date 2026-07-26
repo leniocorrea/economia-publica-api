@@ -214,5 +214,6 @@ public record PncpAtaDto(
 	[property: JsonPropertyName("dataInclusao")] DateTime? DataInclusao,
 	[property: JsonPropertyName("dataAtualizacao")] DateTime? DataAtualizacao,
 	[property: JsonPropertyName("dataAtualizacaoGlobal")] DateTime? DataAtualizacaoGlobal,
-	[property: JsonPropertyName("usuario")] string? Usuario
+	[property: JsonPropertyName("usuario")] string? Usuario,
+	[property: JsonPropertyName("possibilidadeAdesao")] bool? PossibilidadeAdesao
 );

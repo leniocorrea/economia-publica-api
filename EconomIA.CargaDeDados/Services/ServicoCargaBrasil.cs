@@ -778,7 +778,8 @@ public class ServicoCargaBrasil {
 					DataInclusao = ataDto.DataInclusao,
 					DataAtualizacao = ataDto.DataAtualizacao,
 					DataAtualizacaoGlobal = ataDto.DataAtualizacaoGlobal,
-					Usuario = ataDto.Usuario
+					Usuario = ataDto.Usuario,
+					PossibilidadeAdesao = ataDto.PossibilidadeAdesao
 				};
 
 				await atasRepo.UpsertAsync(ata);

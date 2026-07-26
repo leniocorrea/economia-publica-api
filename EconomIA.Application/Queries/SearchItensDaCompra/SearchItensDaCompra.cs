@@ -95,7 +95,8 @@ public static class SearchItensDaCompra {
 			Boolean Cancelado,
 			DateTime? DataAssinatura,
 			DateTime? VigenciaInicio,
-			DateTime? VigenciaFim);
+			DateTime? VigenciaFim,
+			Boolean? PossibilidadeAdesao);
 
 		public record ContratoItem(
 			Int64 Id,
@@ -278,7 +279,8 @@ public static class SearchItensDaCompra {
 								a.Cancelado,
 								a.DataAssinatura,
 								a.VigenciaInicio,
-								a.VigenciaFim))
+								a.VigenciaFim,
+								a.PossibilidadeAdesao))
 							.ToArray()
 						: Array.Empty<Response.AtaItem>();
 
@@ -305,7 +307,7 @@ public static class SearchItensDaCompra {
 
 					var adesao = AvaliadorDeAdesao.Avaliar(
 						atasDoItem
-							.Select(a => new AtaParaAvaliacao(a.NumeroControlePncpAta, a.Cancelado, a.VigenciaFim))
+							.Select(a => new AtaParaAvaliacao(a.NumeroControlePncpAta, a.Cancelado, a.VigenciaFim, a.PossibilidadeAdesao))
 							.ToArray(),
 						x.TemResultado,
 						hoje);

@@ -83,6 +83,10 @@ public class AtaMapping : AggregateMapping<Ata> {
 			.HasMaxLength(200)
 			.IsRequired(false);
 
+		builder.Property(x => x.PossibilidadeAdesao)
+			.HasColumnName("possibilidade_adesao")
+			.IsRequired(false);
+
 		builder.Property(x => x.CriadoEm)
 			.HasColumnName("criado_em")
 			.IsRequired(false);

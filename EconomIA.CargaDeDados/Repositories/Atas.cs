@@ -30,6 +30,7 @@ public class Atas {
 				data_atualizacao,
 				data_atualizacao_global,
 				usuario,
+				possibilidade_adesao,
 				atualizado_em
 			) values (
 				@IdentificadorDoOrgao,
@@ -48,6 +49,7 @@ public class Atas {
 				@DataAtualizacao,
 				@DataAtualizacaoGlobal,
 				@Usuario,
+				@PossibilidadeAdesao,
 				now()
 			)
 			on conflict (numero_controle_pncp_ata) do update
@@ -65,6 +67,7 @@ public class Atas {
 				data_atualizacao = excluded.data_atualizacao,
 				data_atualizacao_global = excluded.data_atualizacao_global,
 				usuario = excluded.usuario,
+				possibilidade_adesao = excluded.possibilidade_adesao,
 				atualizado_em = now()
 			returning identificador;
 		";

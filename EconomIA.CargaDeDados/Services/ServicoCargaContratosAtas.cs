@@ -163,7 +163,8 @@ public class ServicoCargaContratosAtas {
 							DataInclusao = ataDto.DataInclusao,
 							DataAtualizacao = ataDto.DataAtualizacao,
 							DataAtualizacaoGlobal = ataDto.DataAtualizacaoGlobal,
-							Usuario = ataDto.Usuario
+							Usuario = ataDto.Usuario,
+							PossibilidadeAdesao = ataDto.PossibilidadeAdesao
 						};
 
 						await this.atas.UpsertAsync(ata);

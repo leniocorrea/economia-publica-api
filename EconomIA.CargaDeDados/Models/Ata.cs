@@ -55,6 +55,9 @@ public class Ata {
 	[Column("usuario")]
 	public string? Usuario { get; set; }
 
+	[Column("possibilidade_adesao")]
+	public bool? PossibilidadeAdesao { get; set; }
+
 	[Column("criado_em")]
 	public DateTime CriadoEm { get; set; }
 
