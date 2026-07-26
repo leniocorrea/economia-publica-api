@@ -14,8 +14,7 @@ public static class IniciarExecucaoEndpoint {
 	public static IEndpointRouteBuilder MapIniciarExecucao(this IEndpointRouteBuilder app) {
 		app.MapPost("/v1/execucoes", Handle)
 			.WithName("IniciarExecucao")
-			.WithTags("Execuções")
-			.RequireAuthorization();
+			.WithTags("Execuções");
 
 		return app;
 	}

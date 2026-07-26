@@ -14,8 +14,7 @@ public static class CancelarExecucaoEndpoint {
 	public static IEndpointRouteBuilder MapCancelarExecucao(this IEndpointRouteBuilder app) {
 		app.MapPost("/v1/execucoes/{id:long}/cancelar", Handle)
 			.WithName("CancelarExecucao")
-			.WithTags("Execuções")
-			.RequireAuthorization();
+			.WithTags("Execuções");
 
 		return app;
 	}

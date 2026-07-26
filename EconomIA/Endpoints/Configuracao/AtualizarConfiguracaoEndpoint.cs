@@ -14,8 +14,7 @@ public static class AtualizarConfiguracaoEndpoint {
 	public static IEndpointRouteBuilder MapAtualizarConfiguracao(this IEndpointRouteBuilder app) {
 		app.MapPut("/v1/configuracao", Handle)
 			.WithName("AtualizarConfiguracao")
-			.WithTags("Configuração")
-			.RequireAuthorization();
+			.WithTags("Configuração");
 
 		return app;
 	}
