@@ -166,6 +166,8 @@ public class ContratoMapping : AggregateMapping<Contrato> {
 		builder.HasIndex(x => x.IdentificadorDoOrgao)
 			.HasDatabaseName("idx_contrato_orgao");
 
+		builder.HasIndex(x => x.NumeroControlePncpCompra);
+
 		builder.HasOne(x => x.Orgao)
 			.WithMany()
 			.HasForeignKey(x => x.IdentificadorDoOrgao)
