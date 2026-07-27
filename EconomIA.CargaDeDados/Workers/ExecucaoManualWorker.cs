@@ -121,8 +121,22 @@ public class ExecucaoManualWorker : BackgroundService {
 				metricas.TotalComprasProcessadas = resultado.ComprasProcessadas;
 				metricas.TotalItensIndexados = resultado.ItensIndexados;
 				metricas.TotalOrgaosProcessados = resultado.OrgaosProcessados;
+			} else if (execucao.ModoExecucao == ModoExecucao.Enriquecimento) {
+				var servicoBrasil = servicos.GetRequiredService<ServicoCargaBrasil>();
+
+				var resultado = await servicoBrasil.EnriquecerIndiceComAdesaoAsync(stoppingToken);
+
+				metricas.TotalItensIndexados = resultado.DocumentosEnriquecidos;
 			} else {
 				throw new InvalidOperationException($"Modo de execucao nao suportado: {execucao.ModoExecucao}");
+			}
+
+			if (execucao.ModoExecucao == ModoExecucao.Brasil || execucao.ModoExecucao == ModoExecucao.Reconciliacao) {
+				var servicoEnriquecimento = servicos.GetRequiredService<ServicoCargaBrasil>();
+
+				logger.LogInformation("Encadeando enriquecimento de adesao apos {Modo}", execucao.ModoExecucao);
+				var resultadoEnriquecimento = await servicoEnriquecimento.EnriquecerIndiceComAdesaoAsync(stoppingToken);
+				metricas.TotalItensIndexados += resultadoEnriquecimento.DocumentosEnriquecidos;
 			}
 
 			await execucoesCarga.FinalizarComSucessoAsync(execucao.Identificador, metricas);

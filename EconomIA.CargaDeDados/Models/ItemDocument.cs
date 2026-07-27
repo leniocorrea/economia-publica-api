@@ -11,3 +11,5 @@ public class ItemDocument {
 	public Decimal? ValorUnitarioHomologado { get; set; }
 	public Decimal? ValorTotalHomologado { get; set; }
 }
+
+public record ItemAdesao(Int64 Id, DateTime AtaAdesaoVigenciaFim);

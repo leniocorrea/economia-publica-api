@@ -135,4 +135,26 @@ public class ElasticsearchItemSearcherTests {
 
 		boolQuery.Must.Should().HaveCount(1);
 	}
+
+	[Fact]
+	public void com_somente_com_adesao_adiciona_date_range_query_de_vigencia() {
+		var filtros = new SearchFilters(
+			null, null, null, null, null, null, null, null,
+			SomenteComAdesao: true);
+
+		var boolQuery = ElasticsearchItemSearcher.BuildQuery("notebook", filtros);
+
+		boolQuery.Must.Should().HaveCount(2);
+	}
+
+	[Fact]
+	public void sem_somente_com_adesao_nao_adiciona_filtro() {
+		var filtros = new SearchFilters(
+			null, null, null, null, null, null, null, null,
+			SomenteComAdesao: false);
+
+		var boolQuery = ElasticsearchItemSearcher.BuildQuery("notebook", filtros);
+
+		boolQuery.Must.Should().HaveCount(1);
+	}
 }

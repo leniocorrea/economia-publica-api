@@ -92,6 +92,12 @@ public class ElasticsearchItemSearcher : IItensDaCompraSearcher {
 					Lte = filters.DataInclusaoFim
 				});
 			}
+
+			if (filters.SomenteComAdesao == true) {
+				queries.Add(new DateRangeQuery(new Field("ataAdesaoVigenciaFim")) {
+					Gte = DateTime.UtcNow.AddHours(-3).Date
+				});
+			}
 		}
 
 		return new BoolQuery { Must = queries };

@@ -24,6 +24,9 @@ public record ResultadoReconciliacao(
 	Int32 ItensIndexados,
 	Int32 OrgaosProcessados);
 
+public record ResultadoEnriquecimento(
+	Int32 DocumentosEnriquecidos);
+
 public class ServicoCargaBrasil {
 	private const Int32 TamanhoBufferElastic = 1000;
 	private const Int32 TamanhoPagina = 50;
@@ -33,8 +36,11 @@ public class ServicoCargaBrasil {
 	private const Int32 MaxTentativasPorPagina = 3;
 	private const Int32 DiasPorFatia = 30;
 	private static readonly TimeSpan[] IntervalosRetry = { TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30) };
-	private const Int32 MaxComprasReconciliacao = 4;
+	private const Int32 MaxComprasReconciliacao = 1;
 	private const Int32 TamanhoLoteReconciliacao = 200;
+	private const Int32 MaxTentativasReconciliacao = 5;
+	private static readonly TimeSpan DelayPorCompraReconciliacao = TimeSpan.FromMilliseconds(800);
+	private static readonly TimeSpan BackoffThrottleReconciliacao = TimeSpan.FromSeconds(30);
 	private static readonly Regex RegexControleCompra = new Regex(@"^(\d{14})-1-(\d{6})/(\d{4})$", RegexOptions.Compiled);
 
 	private static readonly Int32[] ModalidadesComDados = { 6, 7, 8, 9, 12 };
@@ -428,6 +434,8 @@ public class ServicoCargaBrasil {
 				if (compra is not null) {
 					comprasDoLote.Add(compra);
 				}
+
+				await Task.Delay(DelayPorCompraReconciliacao, token);
 			});
 
 			var (compras, itens) = await ProcessarLoteDeComprasAsync(comprasDoLote.ToList(), bufferElastic, orgaosProcessados, cancellationToken);
@@ -453,6 +461,46 @@ public class ServicoCargaBrasil {
 		return new ResultadoReconciliacao(totalCompras, totalItens, orgaosProcessados.Count);
 	}
 
+	public async Task<ResultadoEnriquecimento> EnriquecerIndiceComAdesaoAsync(CancellationToken cancellationToken = default) {
+		List<ItemAdesao> itens;
+
+		using (var scope = scopeFactory.CreateScope()) {
+			var itensRepo = scope.ServiceProvider.GetRequiredService<ItensDaCompra>();
+			itens = await itensRepo.ObterAdesaoDosItensAsync();
+		}
+
+		logger.LogInformation("Enriquecimento iniciado: {Total} itens de adesao a atualizar", itens.Count);
+
+		var total = 0;
+
+		foreach (var lote in itens.Chunk(TamanhoBufferElastic)) {
+			if (cancellationToken.IsCancellationRequested) {
+				break;
+			}
+
+			await AtualizarAdesaoNoElasticAsync(lote, cancellationToken);
+			total += lote.Length;
+			logger.LogInformation("Enriquecimento: {Total} itens atualizados", total);
+		}
+
+		logger.LogInformation("Enriquecimento finalizado: {Total} itens", total);
+
+		return new ResultadoEnriquecimento(total);
+	}
+
+	private async Task AtualizarAdesaoNoElasticAsync(ItemAdesao[] itens, CancellationToken cancellationToken) {
+		var response = await elasticClient.BulkAsync(b => b
+			.Index("itens-da-compra")
+			.UpdateMany<ItemAdesao>(itens, (op, item) => op
+				.Id(item.Id)
+				.Doc(item)), cancellationToken);
+
+		if (response.Errors) {
+			logger.LogWarning("Alguns itens falharam no enriquecimento. Total: {Total}, Erros: {Erros}",
+				itens.Length, response.ItemsWithErrors.Count());
+		}
+	}
+
 	private async Task<PncpCompraDto?> BuscarCompraAsync(String numeroControlePncpCompra, CancellationToken cancellationToken) {
 		var correspondencia = RegexControleCompra.Match(numeroControlePncpCompra);
 
@@ -463,16 +511,10 @@ public class ServicoCargaBrasil {
 		var cnpj = correspondencia.Groups[1].Value;
 		var sequencial = Int32.Parse(correspondencia.Groups[2].Value);
 		var ano = correspondencia.Groups[3].Value;
+		var url = $"https://pncp.gov.br/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}";
 
-		for (var tentativa = 1; tentativa <= MaxTentativasPorPagina; tentativa++) {
-			using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
-
-			if (!lease.IsAcquired) {
-				await Task.Delay(100, cancellationToken);
-			}
-
+		for (var tentativa = 1; tentativa <= MaxTentativasReconciliacao; tentativa++) {
 			try {
-				var url = $"https://pncp.gov.br/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}";
 				var response = await httpClient.GetAsync(url, cancellationToken);
 
 				if (response.StatusCode == System.Net.HttpStatusCode.NotFound) {
@@ -480,20 +522,21 @@ public class ServicoCargaBrasil {
 				}
 
 				if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests) {
-					await Task.Delay(2000, cancellationToken);
+					logger.LogWarning("Throttle (429) na reconciliacao da compra {Numero}. Aguardando {Segundos}s", numeroControlePncpCompra, BackoffThrottleReconciliacao.TotalSeconds);
+					await Task.Delay(BackoffThrottleReconciliacao, cancellationToken);
 					continue;
 				}
 
-				if (!response.IsSuccessStatusCode) {
-					return null;
+				if (response.IsSuccessStatusCode) {
+					return await response.Content.ReadFromJsonAsync<PncpCompraDto>(cancellationToken: cancellationToken);
 				}
 
-				return await response.Content.ReadFromJsonAsync<PncpCompraDto>(cancellationToken: cancellationToken);
+				await Task.Delay(IntervalosRetry[Math.Min(tentativa - 1, IntervalosRetry.Length - 1)], cancellationToken);
 			} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
 				return null;
 			} catch (Exception ex) {
-				if (tentativa < MaxTentativasPorPagina) {
-					await Task.Delay(IntervalosRetry[tentativa - 1], cancellationToken);
+				if (tentativa < MaxTentativasReconciliacao) {
+					await Task.Delay(IntervalosRetry[Math.Min(tentativa - 1, IntervalosRetry.Length - 1)], cancellationToken);
 					continue;
 				}
 

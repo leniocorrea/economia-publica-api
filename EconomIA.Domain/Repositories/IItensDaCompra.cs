@@ -32,7 +32,8 @@ public record SearchFilters(
 	Decimal? ValorUnitarioHomologadoMinimo,
 	Decimal? ValorUnitarioHomologadoMaximo,
 	Decimal? ValorTotalHomologadoMinimo,
-	Decimal? ValorTotalHomologadoMaximo);
+	Decimal? ValorTotalHomologadoMaximo,
+	Boolean? SomenteComAdesao = null);
 
 public record SearchResult(ImmutableArray<Int64> Ids, Int64 TotalHits, Boolean HasMoreItems);
 

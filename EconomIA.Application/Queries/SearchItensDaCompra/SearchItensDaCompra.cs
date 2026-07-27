@@ -26,7 +26,8 @@ public static class SearchItensDaCompra {
 		Decimal? ValorUnitarioHomologadoMinimo = null,
 		Decimal? ValorUnitarioHomologadoMaximo = null,
 		Decimal? ValorTotalHomologadoMinimo = null,
-		Decimal? ValorTotalHomologadoMaximo = null) : IQuery<Response>;
+		Decimal? ValorTotalHomologadoMaximo = null,
+		Boolean? ApenasComAdesao = null) : IQuery<Response>;
 
 	public record Response(Response.Item[] Items, Int64 TotalHits, Boolean HasMoreItems, String? NextCursor) {
 		public record Item(
@@ -152,7 +153,8 @@ public static class SearchItensDaCompra {
 				query.ValorUnitarioHomologadoMinimo,
 				query.ValorUnitarioHomologadoMaximo,
 				query.ValorTotalHomologadoMinimo,
-				query.ValorTotalHomologadoMaximo);
+				query.ValorTotalHomologadoMaximo,
+				query.ApenasComAdesao);
 
 			var searchResult = await searcher.Search(query.Descricao, filters, pagination, cancellationToken);
 
