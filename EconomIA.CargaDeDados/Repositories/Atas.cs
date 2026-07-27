@@ -87,7 +87,7 @@ public class Atas {
 			  and (c.identificador is null or c.itens_carregados is not true);
 		";
 
-		var resultado = await conexao.QueryAsync<string>(sql);
+		var resultado = await conexao.QueryAsync<string>(sql, commandTimeout: 300);
 		return resultado.ToList();
 	}
 }
