@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using System.Threading.RateLimiting;
 using EconomIA.CargaDeDados.Dtos;
 using EconomIA.CargaDeDados.Models;
@@ -18,6 +19,11 @@ public record ResultadoCargaBrasil(
 	Int32 OrgaosProcessados,
 	Int64 DuracaoMs);
 
+public record ResultadoReconciliacao(
+	Int32 ComprasProcessadas,
+	Int32 ItensIndexados,
+	Int32 OrgaosProcessados);
+
 public class ServicoCargaBrasil {
 	private const Int32 TamanhoBufferElastic = 1000;
 	private const Int32 TamanhoPagina = 50;
@@ -27,8 +33,11 @@ public class ServicoCargaBrasil {
 	private const Int32 MaxTentativasPorPagina = 3;
 	private const Int32 DiasPorFatia = 30;
 	private static readonly TimeSpan[] IntervalosRetry = { TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30) };
+	private const Int32 MaxComprasReconciliacao = 4;
+	private const Int32 TamanhoLoteReconciliacao = 200;
+	private static readonly Regex RegexControleCompra = new Regex(@"^(\d{14})-1-(\d{6})/(\d{4})$", RegexOptions.Compiled);
 
-	private static readonly Int32[] ModalidadesComDados = { 6, 8, 9, 12 };
+	private static readonly Int32[] ModalidadesComDados = { 6, 7, 8, 9, 12 };
 
 	private readonly HttpClient httpClient;
 	private readonly Elastic.Clients.Elasticsearch.ElasticsearchClient elasticClient;
@@ -383,6 +392,116 @@ public class ServicoCargaBrasil {
 		});
 
 		return (comprasProcessadas, itensProcessados);
+	}
+
+	public async Task<ResultadoReconciliacao> ReconciliarAtasOrfasAsync(CancellationToken cancellationToken = default) {
+		List<String> numerosCompra;
+
+		using (var scope = scopeFactory.CreateScope()) {
+			var atasRepo = scope.ServiceProvider.GetRequiredService<Atas>();
+			numerosCompra = await atasRepo.ObterComprasOrfasComAdesaoAsync();
+		}
+
+		logger.LogInformation("Reconciliacao iniciada: {Total} compras orfas com adesao a buscar", numerosCompra.Count);
+
+		var bufferElastic = new ConcurrentBag<ItemDocument>();
+		var orgaosProcessados = new ConcurrentDictionary<Int64, Byte>();
+		var totalCompras = 0;
+		var totalItens = 0;
+		var lotesProcessados = 0;
+
+		var opcoesFetch = new ParallelOptions {
+			MaxDegreeOfParallelism = MaxComprasReconciliacao,
+			CancellationToken = cancellationToken
+		};
+
+		foreach (var lote in numerosCompra.Chunk(TamanhoLoteReconciliacao)) {
+			if (cancellationToken.IsCancellationRequested) {
+				break;
+			}
+
+			var comprasDoLote = new ConcurrentBag<PncpCompraDto>();
+
+			await Parallel.ForEachAsync(lote, opcoesFetch, async (numero, token) => {
+				var compra = await BuscarCompraAsync(numero, token);
+
+				if (compra is not null) {
+					comprasDoLote.Add(compra);
+				}
+			});
+
+			var (compras, itens) = await ProcessarLoteDeComprasAsync(comprasDoLote.ToList(), bufferElastic, orgaosProcessados, cancellationToken);
+			totalCompras += compras;
+			totalItens += itens;
+
+			if (bufferElastic.Count >= TamanhoBufferElastic) {
+				var bufferParaFlush = bufferElastic.ToList();
+				bufferElastic.Clear();
+				await FlushBufferElasticAsync(bufferParaFlush, cancellationToken);
+			}
+
+			lotesProcessados++;
+			logger.LogInformation("Reconciliacao: lote {Lote}, compras acumuladas: {Compras}, itens: {Itens}", lotesProcessados, totalCompras, totalItens);
+		}
+
+		if (bufferElastic.Count > 0) {
+			await FlushBufferElasticAsync(bufferElastic.ToList(), cancellationToken);
+		}
+
+		logger.LogInformation("Reconciliacao finalizada: {Compras} compras, {Itens} itens, {Orgaos} orgaos", totalCompras, totalItens, orgaosProcessados.Count);
+
+		return new ResultadoReconciliacao(totalCompras, totalItens, orgaosProcessados.Count);
+	}
+
+	private async Task<PncpCompraDto?> BuscarCompraAsync(String numeroControlePncpCompra, CancellationToken cancellationToken) {
+		var correspondencia = RegexControleCompra.Match(numeroControlePncpCompra);
+
+		if (!correspondencia.Success) {
+			return null;
+		}
+
+		var cnpj = correspondencia.Groups[1].Value;
+		var sequencial = Int32.Parse(correspondencia.Groups[2].Value);
+		var ano = correspondencia.Groups[3].Value;
+
+		for (var tentativa = 1; tentativa <= MaxTentativasPorPagina; tentativa++) {
+			using var lease = await rateLimiter.AcquireAsync(1, cancellationToken);
+
+			if (!lease.IsAcquired) {
+				await Task.Delay(100, cancellationToken);
+			}
+
+			try {
+				var url = $"https://pncp.gov.br/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}";
+				var response = await httpClient.GetAsync(url, cancellationToken);
+
+				if (response.StatusCode == System.Net.HttpStatusCode.NotFound) {
+					return null;
+				}
+
+				if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests) {
+					await Task.Delay(2000, cancellationToken);
+					continue;
+				}
+
+				if (!response.IsSuccessStatusCode) {
+					return null;
+				}
+
+				return await response.Content.ReadFromJsonAsync<PncpCompraDto>(cancellationToken: cancellationToken);
+			} catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+				return null;
+			} catch (Exception ex) {
+				if (tentativa < MaxTentativasPorPagina) {
+					await Task.Delay(IntervalosRetry[tentativa - 1], cancellationToken);
+					continue;
+				}
+
+				logger.LogWarning(ex, "Erro ao buscar compra {Numero} na reconciliacao", numeroControlePncpCompra);
+			}
+		}
+
+		return null;
 	}
 
 	private async Task<List<PncpItemDto>?> BuscarItensComRateLimitAsync(

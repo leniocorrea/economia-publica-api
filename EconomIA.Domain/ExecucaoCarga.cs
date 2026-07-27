@@ -72,6 +72,7 @@ public static class ModoExecucaoTipo {
 	public const String Manual = "manual";
 	public const String Orgaos = "orgaos";
 	public const String Brasil = "brasil";
+	public const String Reconciliacao = "reconciliacao";
 
 	public static readonly String[] ModosCargaAutomatica = [Incremental, Brasil];
 

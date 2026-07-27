@@ -74,4 +74,20 @@ public class Atas {
 
 		return await conexao.ExecuteScalarAsync<long>(sql, ata);
 	}
+
+	public async Task<List<string>> ObterComprasOrfasComAdesaoAsync() {
+		var sql = @"
+			select distinct a.numero_controle_pncp_compra
+			from public.ata a
+			left join public.compra c on c.numero_controle_pncp = a.numero_controle_pncp_compra
+			where a.cancelado = false
+			  and a.vigencia_fim >= current_date
+			  and a.possibilidade_adesao = true
+			  and a.numero_controle_pncp_compra is not null
+			  and (c.identificador is null or c.itens_carregados is not true);
+		";
+
+		var resultado = await conexao.QueryAsync<string>(sql);
+		return resultado.ToList();
+	}
 }

@@ -113,6 +113,14 @@ public class ExecucaoManualWorker : BackgroundService {
 				metricas.TotalContratosProcessados = resultado.ContratosProcessados;
 				metricas.TotalAtasProcessadas = resultado.AtasProcessadas;
 				metricas.TotalOrgaosProcessados = resultado.OrgaosProcessados;
+			} else if (execucao.ModoExecucao == ModoExecucao.Reconciliacao) {
+				var servicoBrasil = servicos.GetRequiredService<ServicoCargaBrasil>();
+
+				var resultado = await servicoBrasil.ReconciliarAtasOrfasAsync(stoppingToken);
+
+				metricas.TotalComprasProcessadas = resultado.ComprasProcessadas;
+				metricas.TotalItensIndexados = resultado.ItensIndexados;
+				metricas.TotalOrgaosProcessados = resultado.OrgaosProcessados;
 			} else {
 				throw new InvalidOperationException($"Modo de execucao nao suportado: {execucao.ModoExecucao}");
 			}
